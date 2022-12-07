@@ -1,0 +1,217 @@
+---
+title: "Founder Diet Study Data"
+author: "Brian Yandell"
+date: "2022-12-05"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      comment = "", fig.width = 7, fig.height = 7)
+```
+ 
+See file `X202SC22070248-Z01-F001_Report.html` for QC Analysis Report on liver RNAseq data.
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(readr)
+```
+
+# Mouse annotations
+
+```{r}
+excel_sheets("data/mouse annotations for founder diet study.xlsx")
+annot <- read_excel("data/mouse annotations for founder diet study.xlsx") %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+```
+
+```{r}
+annot %>%
+  distinct(diet, diet_no, diet_description)
+```
+
+```{r}
+annot %>%
+  count(strain, sex, diet) %>%
+  unite("sex_diet", sex, diet) %>%
+  pivot_wider(names_from = "sex_diet", values_from = "n")
+```
+
+# Physiological trait counts by strain, sex, diet
+
+```{r}
+excel_sheets("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx")
+physiodef <- read_excel("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx",
+                     sheet = 1, skip = 1) %>%
+  unite("comment", -(1:3)) %>%
+  mutate(comment = str_remove(str_replace_all(
+    str_remove_all(comment, "NA"), "_+", "_"), "^_"))
+physio <- read_excel("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx",
+                     sheet = 2) %>%
+  pivot_longer(-(1:4), names_to = "trait", values_to = "value") %>%
+  mutate(diet = ifelse(as.character(diet) == "200339", "HC_LF", "HF_LC"))
+```
+
+There are `r nrow(distinct(physio, trait))` distinct traits.
+
+Count of mice per strain, sex and diet. All combinations have at least some measurements.
+
+```{r}
+physio %>%
+  filter(!is.na(value)) %>%
+  distinct(strain, number, sex, diet) %>%
+  count(strain, sex, diet) %>%
+  unite("sex_diet", sex, diet) %>%
+  pivot_wider(names_from = "sex_diet", values_from = "n")
+```
+
+Percent missing values across traits
+
+```{r}
+physio %>%
+  filter(!is.na(value)) %>%
+  count(strain, sex, diet) %>%
+  unite("sex_diet", sex, diet) %>%
+  mutate(n = round(100 * (1 - n / max(n)), 2)) %>%
+  pivot_wider(names_from = "sex_diet", values_from = "n")
+```
+
+```{r}
+saveRDS(physio, "physio.rds")
+```
+
+# Plasma metabolite abundance data
+
+```{r}
+excel_sheets("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx")
+removed <- read_excel("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx",
+                     sheet = 1, skip = 4) %>%
+  pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
+  mutate(strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
+         number = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
+         sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
+         diet = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
+  rename(trait = "compound")
+plasma <- read_excel("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx",
+                     sheet = 1, skip = 4) %>%
+  pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
+  mutate(strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
+         number = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
+         sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
+         diet = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
+  rename(trait = "compound")
+```
+
+Removed plasma data appears to be identical.
+
+```{r}
+removed_comp <- (removed %>%
+  filter(!is.na(value)) %>%
+  count(trait))$trait
+plasma_comp <- (plasma %>%
+  filter(!is.na(value)) %>%
+  count(trait))$trait
+m <- match(removed_comp, plasma_comp)
+sum(is.na(m))
+```
+
+```{r}
+plasmar <- full_join(
+  plasma %>% select(strain, number, sex, diet, trait, value),
+  removed %>% select(strain, number, sex, diet, trait, value),
+  by = c("strain", "number", "sex", "diet", "trait"),
+  suffix = c(".p", ".r"))
+summary(plasmar$value.p - plasmar$value.r)
+```
+
+There are missing data for B6 mice across 3 of the 4 sex:diet combinations.
+
+```{r}
+plasma %>%
+  filter(!is.na(value)) %>%
+  distinct(strain, number, sex, diet) %>%
+  count(strain, sex, diet) %>%
+  unite("sex_diet", sex, diet) %>%
+  pivot_wider(names_from = "sex_diet", values_from = "n")
+```
+
+```{r}
+saveRDS(plasma, "plasma.rds")
+```
+
+# Liver RNAseq
+
+Note that annotation file relates the number to the sex and diet.
+
+```{r}
+liver <- read_csv("data/normalizedcount.csv") %>%
+  rename(trait = "...1") %>%
+  mutate(trait = as.character(trait)) %>%
+  pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
+  separate(strain_number, sep = "_", into = c("strain","number"))
+```
+
+```{r}
+liver <- left_join(
+  liver,
+  annot %>% mutate(number = as.character(number),
+                   strain = ifelse(strain == "129", "A129", strain)),
+  by = c("strain", "number"))
+```
+
+```{r}
+saveRDS(liver, "liver.rds")
+```
+
+# Analysis
+
+```{r}
+broomit <- function(traitsdata) {
+  map(
+    split(traitsdata, traitsdata$trait),
+    function(traitdata) {
+      form <- formula(value ~ strain * sex * diet)
+      fit <- stats::lm(form, traitdata)
+      as.tibble(data.frame(
+        rawSD = sd(traitdata$value, na.rm = TRUE),
+        broom::tidy(stats::drop1(fit, fit, test = "F")) %>%
+          filter(grepl("strain:", term)) %>%
+          select(term, p.value) %>%
+          pivot_wider(names_from = "term",
+                      values_from = "p.value")))
+      }) %>%
+  bind_rows(.id = "trait")
+}
+```
+
+```{r}
+physio <- readRDS("physio.rds")
+```
+
+```{r}
+physiosum <- broomit(physio)
+```
+
+```{r}
+head(physiosum)
+```
+
+```{r}
+plasmasum <- broomit(readRDS("plasma.rds"))
+```
+
+```{r}
+liversum <- broomit(readRDS("liver.rds"))
+```
+
+```{r}
+saveRDS(
+  bind_rows(
+    physio = physiosum,
+    plasma = plasmasum,
+    liver = liversum,
+    .id = "datatype"),
+  "traitsum.rds")
+```
+

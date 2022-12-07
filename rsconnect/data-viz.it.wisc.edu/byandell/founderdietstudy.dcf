@@ -1,0 +1,14 @@
+name: founderdietstudy
+title: FounderDietStudy
+username: byandell
+account: byandell
+server: data-viz.it.wisc.edu
+hostUrl: https://data-viz.it.wisc.edu/__api__
+appId: 462
+bundleId: 2506
+url: https://data-viz.it.wisc.edu/FounderDietStudy/
+when: 1670427608.52832
+lastSyncTime: 1670427608.52833
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: FounderDietStudy_Data.html|FounderDietStudy_Data.Rmd|FounderDietStudy.html|FounderDietStudy.Rmd|X202SC22070248-Z01-F001_Report.html|data
