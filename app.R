@@ -17,6 +17,7 @@ ui <- fluidPage(
                     c("variability", "alphabetical", "original", "p_sex_diet", "p_diet", "p_sex"),
                     "variability"),
         uiOutput("trait"),
+        sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         shiny::column(
           7,
           shiny::textInput("plotfile", "Plot File", "myplot")),
@@ -26,9 +27,7 @@ ui <- fluidPage(
     
     # Main panel for displaying outputs ----
     mainPanel(
-      
-      # Output: Histogram ----
-      plotOutput("distPlot")
+      uiOutput("distUI")
       
     )
   )
@@ -106,11 +105,16 @@ server <- function(session, input, output) {
   output$distPlot <- renderPlot({
     distplot()
   })
+  output$distUI <- renderUI({
+    req(input$height)
+    plotOutput("distPlot", height = paste0(input$height, "in"))
+  })
   output$downloadPlot <- shiny::downloadHandler(
     filename = function() {
       paste0(shiny::req(input$plotfile), ".pdf") },
     content = function(file) {
-      grDevices::pdf(file, width = 9)
+      req(input$height)
+      grDevices::pdf(file, width = 9, height = input$height)
       print(distplot())
       grDevices::dev.off()
     }
