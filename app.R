@@ -20,7 +20,7 @@ ui <- fluidPage(
         sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         shiny::column(
           7,
-          shiny::textInput("plotfile", "Plot File", "myplot")),
+          uiOutput("filename")),
         shiny::column(
           5,
           downloadButton("downloadPlot", "Plots")))),
@@ -108,6 +108,13 @@ server <- function(session, input, output) {
   output$distUI <- renderUI({
     req(input$height)
     plotOutput("distPlot", height = paste0(input$height, "in"))
+  })
+  output$filename <- renderUI({
+    ltrait <- length(req(input$trait))
+    filename <- paste0(req(input$datatype), "_",
+                       paste(abbreviate(input$trait, ceiling(60 / ltrait)),
+                             collapse = "_"))
+    shiny::textInput("plotfile", "Plot File", filename)
   })
   output$downloadPlot <- shiny::downloadHandler(
     filename = function() {

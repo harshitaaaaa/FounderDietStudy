@@ -10,7 +10,8 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       comment = "", fig.width = 7, fig.height = 7)
 ```
  
-See file `X202SC22070248-Z01-F001_Report.html` for QC Analysis Report on liver RNAseq data.
+Data comes from Google Drive <https://drive.google.com/drive/u/1/folders/1v2xyz0s0ELYkEwMdEOMjAvLVWJA1OkGG>.
+See file `X202SC22070248-Z01-F001_Report.html` for QC Analysis Report on liver RNAseq data (in zip file under folder `Liver RNAseq`).
 
 ```{r}
 library(tidyverse)
@@ -153,11 +154,44 @@ liver <- read_csv("data/normalizedcount.csv") %>%
 ```
 
 ```{r}
+annot2 <- read_csv("data/varianceStabilizingTransformation/annotation2.csv")
+```
+
+```{r}
 liver <- left_join(
   liver,
   annot %>% mutate(number = as.character(number),
                    strain = ifelse(strain == "129", "A129", strain)),
   by = c("strain", "number"))
+```
+
+```{r}
+liver <- left_join(
+  liver %>% rename(ENTREZID = "trait"),
+  annot2[,-1] %>%
+    rename(trait = "SYMBOL") %>%
+    mutate(ENTREZID = as.character(ENTREZID)),
+  by = "ENTREZID") %>%
+  select(-ENTREZID) %>%
+  select(trait, everything())
+```
+
+## Reduce to ones with few small values
+
+```{r}
+liver <- liver %>%
+  filter(value > min(liver$value))
+```
+
+Percent missing values
+
+```{r}
+liver %>%
+  filter(!is.na(value)) %>%
+  count(strain, sex, diet) %>%
+  unite("sex_diet", sex, diet) %>%
+  mutate(n = round(100 * (1 - n / max(n)), 2)) %>%
+  pivot_wider(names_from = "sex_diet", values_from = "n")
 ```
 
 ```{r}
@@ -171,6 +205,12 @@ broomit <- function(traitsdata) {
   map(
     split(traitsdata, traitsdata$trait),
     function(traitdata) {
+      ct <- distinct(traitdata, strain, sex, diet)
+      ct <- count(ct, sex, diet)
+      if(nrow(ct) < 4 | min(ct$n) < 2) {
+        # Do nothing if any combination of sex, diet is empty.
+        return(NULL)
+      }
       form <- formula(value ~ strain * sex * diet)
       fit <- stats::lm(form, traitdata)
       as.tibble(data.frame(
@@ -213,5 +253,30 @@ saveRDS(
     liver = liversum,
     .id = "datatype"),
   "traitsum.rds")
+```
+
+```{r}
+write_csv(traitsum, "trait_summary.csv")
+```
+
+```{r}
+knitr::knit_exit()
+```
+
+```{r}
+tmp <- traitsum %>%
+  filter(datatype == "liver")
+tmp <- left_join(
+  tmp %>% rename(ENTREZID = "trait"),
+  annot2[,-1] %>%
+    rename(trait = "SYMBOL") %>%
+    mutate(ENTREZID = as.character(ENTREZID)),
+  by = "ENTREZID") %>%
+  select(-ENTREZID) %>%
+  select(datatype, trait, everything())
+```
+
+```{r}
+traitsum[traitsum$datatype == "liver", ] <- tmp
 ```
 

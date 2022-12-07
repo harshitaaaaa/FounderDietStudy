@@ -5,10 +5,10 @@ account: byandell
 server: data-viz.it.wisc.edu
 hostUrl: https://data-viz.it.wisc.edu/__api__
 appId: 462
-bundleId: 2506
+bundleId: 2510
 url: https://data-viz.it.wisc.edu/FounderDietStudy/
-when: 1670427608.52832
-lastSyncTime: 1670427608.52833
+when: 1670452099.451
+lastSyncTime: 1670452099.45103
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: FounderDietStudy_Data.html|FounderDietStudy_Data.Rmd|FounderDietStudy.html|FounderDietStudy.Rmd|X202SC22070248-Z01-F001_Report.html|data
+ignoredFiles: FounderDietStudy_Data.html|FounderDietStudy_Data.Rmd|FounderDietStudy.html|FounderDietStudy.Rmd|liver_all.rds|X202SC22070248-Z01-F001_Report.html|data
