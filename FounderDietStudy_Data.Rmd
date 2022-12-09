@@ -19,6 +19,31 @@ library(readxl)
 library(readr)
 ```
 
+```{r}
+broomit <- function(traitsdata) {
+  map(
+    split(traitsdata, traitsdata$trait),
+    function(traitdata) {
+      ct <- distinct(traitdata, strain, sex, diet)
+      ct <- count(ct, sex, diet)
+      if(nrow(ct) < 4 | min(ct$n) < 2) {
+        # Do nothing if any combination of sex, diet is empty.
+        return(NULL)
+      }
+      form <- formula(value ~ strain * sex * diet)
+      fit <- stats::lm(form, traitdata)
+      as.tibble(data.frame(
+        rawSD = sd(traitdata$value, na.rm = TRUE),
+        broom::tidy(stats::drop1(fit, fit, test = "F")) %>%
+          filter(grepl("strain:", term)) %>%
+          select(term, p.value) %>%
+          pivot_wider(names_from = "term",
+                      values_from = "p.value")))
+      }) %>%
+  bind_rows(.id = "trait")
+}
+```
+
 # Mouse annotations
 
 ```{r}
@@ -82,6 +107,13 @@ physio %>%
 saveRDS(physio, "physio.rds")
 ```
 
+## Physiological summaries
+
+```{r}
+physiosum <- broomit(physio)
+rm(physio)
+```
+
 # Plasma metabolite abundance data
 
 ```{r}
@@ -139,6 +171,16 @@ plasma %>%
 
 ```{r}
 saveRDS(plasma, "plasma.rds")
+```
+
+## Plasma summaries
+
+```{r}
+plasmasum <- broomit(plasma)
+plasmaorder <- distinct(plasma, trait)$trait
+rm(plasma)
+m <- match(plasmaorder, plasmasum$trait)
+plasmasum <- plasmasum[m,]
 ```
 
 # Liver RNAseq
@@ -201,52 +243,20 @@ liver %>%
 saveRDS(liver, "liver.rds")
 ```
 
-# Analysis
+## Liver summaries
 
 ```{r}
-broomit <- function(traitsdata) {
-  map(
-    split(traitsdata, traitsdata$trait),
-    function(traitdata) {
-      ct <- distinct(traitdata, strain, sex, diet)
-      ct <- count(ct, sex, diet)
-      if(nrow(ct) < 4 | min(ct$n) < 2) {
-        # Do nothing if any combination of sex, diet is empty.
-        return(NULL)
-      }
-      form <- formula(value ~ strain * sex * diet)
-      fit <- stats::lm(form, traitdata)
-      as.tibble(data.frame(
-        rawSD = sd(traitdata$value, na.rm = TRUE),
-        broom::tidy(stats::drop1(fit, fit, test = "F")) %>%
-          filter(grepl("strain:", term)) %>%
-          select(term, p.value) %>%
-          pivot_wider(names_from = "term",
-                      values_from = "p.value")))
-      }) %>%
-  bind_rows(.id = "trait")
-}
+liversum <- broomit(liver)
+rm(liver)
+liverorder <- unite(annot2, trait, 3:2)$trait
+liverorder <- liverorder[liverorder %in% liversum$trait]
+m <- match(liverorder, liversum$trait)
+liversum <- liversum[m,]
 ```
 
-```{r}
-physio <- readRDS("physio.rds")
-```
+# Summaries
 
-```{r}
-physiosum <- broomit(physio)
-```
-
-```{r}
-head(physiosum)
-```
-
-```{r}
-plasmasum <- broomit(readRDS("plasma.rds"))
-```
-
-```{r}
-liversum <- broomit(readRDS("liver.rds"))
-```
+See computations above for `physiosum`, `plasmasum` and `liversum` using `broomit`.
 
 ```{r}
 saveRDS(
@@ -261,43 +271,3 @@ saveRDS(
 ```{r}
 write_csv(traitsum, "trait_summary.csv")
 ```
-
-```{r}
-knitr::knit_exit()
-```
-
-```{r}
-tmp <- traitsum %>%
-  filter(datatype == "liver")
-tmp <- left_join(
-  tmp %>% rename(ENTREZID = "trait"),
-  annot2[,-1] %>%
-    rename(trait = "SYMBOL") %>%
-    mutate(ENTREZID = as.character(ENTREZID)),
-  by = "ENTREZID") %>%
-  select(-ENTREZID) %>%
-  select(datatype, trait, everything())
-```
-
-```{r}
-traitsum[traitsum$datatype == "liver", ] <- tmp
-```
-
-```{r}
-plasmaorder <- distinct(plasma, trait)$trait
-tmp <- traitsum[traitsum$datatype == "plasma", ]
-m <- match(plasmaorder, tmp$trait)
-traitsum[traitsum$datatype == "plasma", ] <- tmp[m,]
-
-# Some of these are duplicted. Need to be careful.
-tmp2 <- liverorder[duplicated(liverorder) == 1]
-[1] "Gm11237" "Gm3005"  "Cfap47"  "Gm3500"  "Ttc6"    "Gm16867"
-annot2[annot2$SYMBOL %in% tmp2,]
-
-liverorder <- unite(annot2, trait, 3:2)$trait
-tmp <- traitsum[traitsum$datatype == "liver", ]
-liverorder <- liverorder[liverorder %in% tmp$trait]
-m <- match(liverorder, tmp$trait)
-traitsum[traitsum$datatype == "liver", ] <- tmp[m,]
-```
-
