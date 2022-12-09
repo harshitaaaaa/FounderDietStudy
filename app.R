@@ -169,6 +169,7 @@ server <- function(session, input, output) {
       group_by(strain, sex_diet, trait) %>%
       summarize(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
       ungroup() %>%
+      mutate(value = signif(value, 4)) %>%
       pivot_wider(names_from = "strain", values_from = "value") %>%
       arrange(trait, sex_diet)},
     escape = FALSE,
