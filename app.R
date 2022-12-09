@@ -151,7 +151,10 @@ server <- function(session, input, output) {
         shiny::textInput("plotname", "Plot File Prefix", filename)),
       shiny::column(
         3,
-        downloadButton("downloadPlot", "Plot")))
+        downloadButton("downloadPlot", "Plots")),
+      shiny::column(
+        3,
+        downloadButton("downloadMean", "Means")))
   })
   output$downloadPlot <- shiny::downloadHandler(
     filename = function() {
@@ -164,14 +167,17 @@ server <- function(session, input, output) {
     })
   
   # Data Table
-  output$datatable <- DT::renderDataTable({
+  datameans <- reactive({
     datatraits() %>%
       group_by(strain, sex_diet, trait) %>%
       summarize(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
       ungroup() %>%
       mutate(value = signif(value, 4)) %>%
       pivot_wider(names_from = "strain", values_from = "value") %>%
-      arrange(trait, sex_diet)},
+      arrange(trait, sex_diet)
+  })
+  output$datatable <- DT::renderDataTable(
+    datameans(),
     escape = FALSE,
     options = list(scrollX = TRUE, pageLength = 10))
   output$tablesum <- DT::renderDataTable(
@@ -182,6 +188,13 @@ server <- function(session, input, output) {
     filename <- req(input$datatype)
     shiny::textInput("filename", "Summary File Prefix", filename)
   })
+  output$downloadMean <- shiny::downloadHandler(
+    filename = function() {
+      paste0(shiny::req(input$plotname), ".csv") },
+    content = function(file) {
+      utils::write.csv(datameans(), file, row.names = FALSE)
+    }
+  )
   output$downloadTable <- shiny::downloadHandler(
     filename = function() {
       paste0(shiny::req(input$tablename), ".csv") },
