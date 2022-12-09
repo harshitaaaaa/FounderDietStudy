@@ -144,11 +144,11 @@ server <- function(session, input, output) {
     ltrait <- length(req(input$trait))
     filename <- paste0(req(input$datatype), "_",
                        paste(abbreviate(input$trait, ceiling(60 / ltrait)),
-                             collapse = "_"))
+                             collapse = "."))
     fluidRow(
       shiny::column(
         6,
-        shiny::textInput("plotname", "Plot File Prefix", filename)),
+        shiny::textAreaInput("plotname", "File Prefix", filename)),
       shiny::column(
         3,
         downloadButton("downloadPlot", "Plots")),
