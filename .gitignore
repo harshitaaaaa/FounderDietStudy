@@ -9,3 +9,4 @@ data/
 *.rds
 *.csv
 *.zip
+rsconnect/
