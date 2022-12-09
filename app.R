@@ -16,7 +16,6 @@ ui <- fluidPage(
         selectInput("order", "Order traits by",
                     c("p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
                     "p_sex_diet"),
-        uiOutput("trait"),
         sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         uiOutput("downloadPlotUI"),
         fluidRow(
@@ -25,7 +24,8 @@ ui <- fluidPage(
             uiOutput("tablename")),
           shiny::column(
             3,
-            shiny::downloadButton("downloadTable", "Summary"))))),
+            shiny::downloadButton("downloadTable", "Summary")))),
+      uiOutput("trait")),
     
     # Main panel for displaying outputs ----
     mainPanel(
