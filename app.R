@@ -12,10 +12,16 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       tagList(
-        selectInput("datatype", "Data:", c("physio","liver","plasma"), "physio"),
-        selectInput("order", "Order traits by",
-                    c("p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
-                    "p_sex_diet"),
+        fluidRow(
+          shiny::column(
+            6,
+            selectInput("datatype", "Data:",
+                        c("physio","liver","plasma"), "physio")),
+          shiny::column(
+            6,
+            selectInput("order", "Order traits by",
+                        c("p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
+                        "p_sex_diet"))),
         sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         uiOutput("downloadPlotUI"),
         fluidRow(

@@ -10,14 +10,27 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       comment = "", fig.width = 7, fig.height = 7)
 ```
  
-Data comes from Google Drive <https://drive.google.com/drive/u/1/folders/1v2xyz0s0ELYkEwMdEOMjAvLVWJA1OkGG>.
-See file `X202SC22070248-Z01-F001_Report.html` for QC Analysis Report on liver RNAseq data (in zip file under folder `Liver RNAseq`).
-
 ```{r}
 library(tidyverse)
 library(readxl)
 library(readr)
 ```
+
+Data for this repository are identified by `data/source.csv`,
+which is not saved with the repo.
+
+```{r}
+links <- read_csv(file.path("data", "source.csv"))
+linkpath <- function(dataset, datadir = "data") {
+  filename <- (links %>% filter(object == dataset))$address
+  if(datadir != "")
+  filename <- file.path(datadir, filename)
+  filename
+}
+```
+
+Data comes from Google Drive <`r linkpath("google")`>.
+See the QC Analysis Report on liver RNAseq data (in zip file under folder `Liver RNAseq`).
 
 ```{r}
 broomit <- function(traitsdata) {
@@ -47,8 +60,9 @@ broomit <- function(traitsdata) {
 # Mouse annotations
 
 ```{r}
-excel_sheets("data/mouse annotations for founder diet study.xlsx")
-annot <- read_excel("data/mouse annotations for founder diet study.xlsx") %>%
+annotfile <- linkpath("annot")
+excel_sheets(annotfile)
+annot <- read_excel(annotfile) %>%
   mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
 ```
 
@@ -67,14 +81,13 @@ annot %>%
 # Physiological trait counts by strain, sex, diet
 
 ```{r}
-excel_sheets("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx")
-physiodef <- read_excel("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx",
-                     sheet = 1, skip = 1) %>%
+physiofile <- linkpath("physio")
+excel_sheets(physiofile)
+physiodef <- read_excel(physiofile, sheet = 1, skip = 1) %>%
   unite("comment", -(1:3)) %>%
   mutate(comment = str_remove(str_replace_all(
     str_remove_all(comment, "NA"), "_+", "_"), "^_"))
-physio <- read_excel("data/Final raw and computed in vivo founder data for Mark for correlations.xlsx",
-                     sheet = 2) %>%
+physio <- read_excel(physiofile, sheet = 2) %>%
   pivot_longer(-(1:4), names_to = "trait", values_to = "value") %>%
   mutate(diet = ifelse(as.character(diet) == "200339", "HC_LF", "HF_LC"))
 ```
@@ -117,17 +130,16 @@ rm(physio)
 # Plasma metabolite abundance data
 
 ```{r}
-excel_sheets("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx")
-removed <- read_excel("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx",
-                     sheet = 1, skip = 4) %>%
+plasmafile <- linkpath("plasma")
+excel_sheets(plasmafile)
+removed <- read_excel(plasmafile, sheet = 1, skip = 4) %>%
   pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
   mutate(strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
          number = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
          sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
          diet = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
   rename(trait = "compound")
-plasma <- read_excel("data/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx",
-                     sheet = 1, skip = 4) %>%
+plasma <- read_excel(plasmafile, sheet = 1, skip = 4) %>%
   pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
   mutate(strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
          number = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
@@ -188,7 +200,8 @@ plasmasum <- plasmasum[m,]
 Note that annotation file relates the number to the sex and diet.
 
 ```{r}
-liver <- read_csv("data/normalizedcount.csv") %>%
+liverfile <- linkpath("liver")
+liver <- read_csv(liverfile) %>%
   rename(trait = "...1") %>%
   mutate(trait = as.character(trait)) %>%
   pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
@@ -196,7 +209,8 @@ liver <- read_csv("data/normalizedcount.csv") %>%
 ```
 
 ```{r}
-annot2 <- read_csv("data/varianceStabilizingTransformation/annotation2.csv")
+liver_annot <- linkpath("liver_annot")
+annot2 <- read_csv(liver_annot)
 ```
 
 ```{r}
@@ -259,13 +273,12 @@ liversum <- liversum[m,]
 See computations above for `physiosum`, `plasmasum` and `liversum` using `broomit`.
 
 ```{r}
-saveRDS(
-  bind_rows(
-    physio = physiosum,
-    plasma = plasmasum,
-    liver = liversum,
-    .id = "datatype"),
-  "traitsum.rds")
+traitsum <- bind_rows(
+  physio = physiosum,
+  plasma = plasmasum,
+  liver = liversum,
+  .id = "datatype")
+saveRDS(traitsum, "traitsum.rds")
 ```
 
 ```{r}
