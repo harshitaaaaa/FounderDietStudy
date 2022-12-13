@@ -286,6 +286,9 @@ server <- function(session, input, output) {
     if(is.null(scatdata())) {
       return(ggplot())
     }
+    if(!any(unique(scatdata()$trait) %in% input$pair[1:2])) {
+      return(ggplot())
+    }
     plotly::ggplotly(
       ggplot(scatdata()) +
         aes(.data[[input$pair[1]]], .data[[input$pair[2]]],
