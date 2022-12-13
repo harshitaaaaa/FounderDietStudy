@@ -12,10 +12,11 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       tagList(
+        uiOutput("intro"),
         fluidRow(
           shiny::column(
             6,
-            selectInput("datatype", "Data:",
+            selectInput("datatype", "Measurement set",
                         c("physio","liver","plasma"), "physio")),
           shiny::column(
             6,
@@ -42,6 +43,21 @@ ui <- fluidPage(
 )
 
 server <- function(session, input, output) {
+  
+  output$intro <- renderUI({
+    tagList("This founder dataset uses the",
+            shiny::a("8 CC mice strains", href = "https://www.jax.org/news-and-insights/2009/april/the-collaborative-cross-a-powerful-systems-genetics-tool"),
+            "two diets (HC_LF = high carb, low fat; HF_LC = high fat, low carb) and both sexes. There are three primary measurements collected on 192 mice:",
+            tags$ul(
+              tags$li("physio: physiological data"),
+              tags$li("liver: RNA-seq on liver"),
+              tags$li("plasma: concentrations of circulating metabolites")),
+            "Select one or more traits after deciding measurement set and trait order. Trait window allows typing to find desired traits.",
+            "Plots and data means (for selected traits) and data summaries (for whole measurement set) can be downloaded.",
+            "See",
+            shiny::a("Attie Lab Diabetes Database", href = "http://diabetes.wisc.edu/"),
+            "for earlier study.")
+  })
   
   # Trait summaries (for ordering traits, and summary table)
   traitsum <- reactive({
