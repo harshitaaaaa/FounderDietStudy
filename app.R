@@ -236,7 +236,7 @@ server <- function(session, input, output) {
     options = list(scrollX = TRUE, pageLength = 10))
   output$tablename <- renderUI({
     filename <- req(input$datatype)
-    shiny::textInput("filename", "Summary File Prefix", filename)
+    shiny::textInput("tablename", "Summary File Prefix", filename)
   })
   output$downloadMean <- shiny::downloadHandler(
     filename = function() {
@@ -247,6 +247,7 @@ server <- function(session, input, output) {
   )
   output$downloadTable <- shiny::downloadHandler(
     filename = function() {
+      req(input$datatype)
       paste0(shiny::req(input$tablename), ".csv") },
     content = function(file) {
       utils::write.csv(traitarrange(), file, row.names = FALSE)
