@@ -60,7 +60,9 @@ server <- function(session, input, output) {
             "Plots and data means (for selected traits) and data summaries (for whole measurement set) can be downloaded.",
             "See",
             shiny::a("Attie Lab Diabetes Database", href = "http://diabetes.wisc.edu/"),
-            "for earlier study.")
+            "for earlier study.",
+            "GigHub:", shiny::a("byandell/FounderDietStudy",
+                                        href = "https://github.com/byandell/FounderDietStudy"))
   })
   
   output$strains <- renderUI({
