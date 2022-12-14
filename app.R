@@ -17,15 +17,17 @@ ui <- fluidPage(
         uiOutput("intro"),
         fluidRow(
           shiny::column(
-            6,
+            4,
             selectInput("datatype", "Measurement set",
                         c("physio","liver","plasma"), "physio")),
           shiny::column(
-            6,
+            4,
             selectInput("order", "Order traits by",
                         c("p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
-                        "p_sex_diet"))),
-        radioButtons("facet","Facet by", c("strain","sex_diet"), "strain", inline = TRUE),
+                        "p_sex_diet")),
+          shiny::column(
+            4,
+            radioButtons("facet","Facet by", c("strain","sex_diet"), "strain", inline = TRUE))),
         uiOutput("strains"),
         sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         uiOutput("downloadPlotUI"),
@@ -49,14 +51,15 @@ ui <- fluidPage(
 server <- function(session, input, output) {
   
   output$intro <- renderUI({
-    tagList("This founder dataset uses the",
-            shiny::a("8 CC mice strains", href = "https://www.jax.org/news-and-insights/2009/april/the-collaborative-cross-a-powerful-systems-genetics-tool"),
-            "two diets (HC_LF = high carb, low fat; HF_LC = high fat, low carb) and both sexes. There are three primary measurements collected on 192 mice:",
+    tagList("This founder dataset consists of",
+            shiny::a("8 CC mice strains,", href = "https://www.jax.org/news-and-insights/2009/april/the-collaborative-cross-a-powerful-systems-genetics-tool"),
+            "two diets (HC_LF = high carb, low fat; HF_LC = high fat, low carb) and both sexes with three measurement sets collected on 192 mice:",
             tags$ul(
               tags$li("physio: physiological data"),
               tags$li("liver: RNA-seq on liver"),
               tags$li("plasma: concentrations of circulating metabolites")),
-            "Select one or more traits after deciding measurement set and trait order. Trait window allows typing to find desired traits.",
+            "Select one or more traits after deciding measurement set and trait order. Traits window supports partial matching to find desired traits.",
+            "Facet plots by strain or sex_diet and subset strains if desired.",
             "Plots and data means (for selected traits) and data summaries (for whole measurement set) can be downloaded.",
             "See",
             shiny::a("Attie Lab Diabetes Database", href = "http://diabetes.wisc.edu/"),
