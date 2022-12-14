@@ -234,7 +234,8 @@ server <- function(session, input, output) {
     escape = FALSE,
     options = list(scrollX = TRUE, pageLength = 10))
   output$tablesum <- DT::renderDataTable(
-    traitarrange(),
+    traitarrange() %>%
+      mutate(across(where(is.numeric), function(x) signif(x, 4))),
     escape = FALSE,
     options = list(scrollX = TRUE, pageLength = 10))
   output$tablename <- renderUI({
