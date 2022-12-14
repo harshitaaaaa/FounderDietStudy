@@ -205,7 +205,8 @@ liver <- read_csv(liverfile) %>%
   rename(trait = "...1") %>%
   mutate(trait = as.character(trait)) %>%
   pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
-  separate(strain_number, sep = "_", into = c("strain","number"))
+  separate(strain_number, sep = "_", into = c("strain","number")) %>%
+  mutate(strain = ifelse(strain == "A129", "129", strain))
 ```
 
 ```{r}
@@ -216,8 +217,7 @@ annot2 <- read_csv(liver_annot)
 ```{r}
 liver <- left_join(
   liver,
-  annot %>% mutate(number = as.character(number),
-                   strain = ifelse(strain == "129", "A129", strain)),
+  annot %>% mutate(number = as.character(number)),
   by = c("strain", "number"))
 ```
 
