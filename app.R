@@ -286,8 +286,8 @@ server <- function(session, input, output) {
     if(is.null(scatdata())) {
       return(ggplot())
     }
-    if(!any(unique(scatdata()$trait) %in% input$pair[1:2])) {
-      return(ggplot())
+    if(!all(input$pair[1:2] %in% names(scatdata()))) {
+       return(ggplot())
     }
     plotly::ggplotly(
       ggplot(scatdata()) +
