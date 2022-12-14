@@ -2,6 +2,10 @@ library(shiny)
 library(tidyverse)
 library(readr)
 library(readxl)
+library(RColorBrewer)
+
+sex_diet_colors <- brewer.pal(n=4, name = "Dark2")
+names(sex_diet_colors) <- c("F_HC_LF", "F_HF_LC", "M_HC_LF", "M_HF_LC")
 CCcolors <- c("#F0E442", "#555555", "#E69F00", "#0072B2",
               "#56B4E9", "#009E73", "#D55E00", "#CC79A7")
 names(CCcolors) <- c("AJ", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB")
@@ -167,17 +171,19 @@ server <- function(session, input, output) {
     switch(input$facet,
            strain = {
              p <- p +
-               aes(sex_diet, value, col = sex_diet) +
-               facet_grid(trait ~ strain, scales = "free_y")
+               aes(sex_diet, value, fill = sex_diet) +
+               geom_jitter(size = 3, shape = 21, color = "black", alpha = 0.65) +
+               facet_grid(trait ~ strain, scales = "free_y") +
+               scale_fill_manual(values = sex_diet_colors)
            },
            sex_diet = {
              p <- p +
-               aes(strain, value, col = strain) +
+               aes(strain, value, fill = strain) +
+               geom_jitter(size = 3, shape = 21, color = "black", alpha = 0.65) +
                facet_grid(trait ~ sex_diet, scales = "free_y") +
-               scale_color_manual(values = CCcolors)
+               scale_fill_manual(values = CCcolors)
            })
     p +
-      geom_jitter() +
       theme(legend.position = "none",
             axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
       ylab(ifelse(ltrait == 1, input$trait, "Trait Value")) +
