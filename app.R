@@ -176,14 +176,14 @@ server <- function(session, input, output) {
              p <- p +
                aes(sex_diet, value, fill = sex_diet) +
                geom_jitter(size = 3, shape = 21, color = "black", alpha = 0.65) +
-               facet_grid(trait ~ strain, scales = "free_y") +
+               facet_grid(datatype + trait ~ strain, scales = "free_y") +
                scale_fill_manual(values = sex_diet_colors)
            },
            sex_diet = {
              p <- p +
                aes(strain, value, fill = strain) +
                geom_jitter(size = 3, shape = 21, color = "black", alpha = 0.65) +
-               facet_grid(trait ~ sex_diet, scales = "free_y") +
+               facet_grid(datatype + trait ~ sex_diet, scales = "free_y") +
                scale_fill_manual(values = CCcolors)
            })
     p +
