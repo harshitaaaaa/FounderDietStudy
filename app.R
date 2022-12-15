@@ -9,6 +9,10 @@ names(sex_diet_colors) <- c("F_HC_LF", "F_HF_LC", "M_HC_LF", "M_HF_LC")
 CCcolors <- c("#F0E442", "#555555", "#E69F00", "#0072B2",
               "#56B4E9", "#009E73", "#D55E00", "#CC79A7")
 names(CCcolors) <- c("AJ", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB")
+
+traitdata <- readRDS("traits.rds")
+traitsumdata <- readRDS("traitsum.rds")
+
 ################################################################
 
 
@@ -23,7 +27,8 @@ ui <- fluidPage(
           shiny::column(
             4,
             selectInput("datatype", "Measurement set",
-                        c("physio","liver","plasma"), "physio")),
+                        c("physio","liver","plasma"), "physio",
+                        multiple = TRUE)),
           shiny::column(
             4,
             selectInput("order", "Order traits by",
@@ -79,17 +84,15 @@ server <- function(session, input, output) {
   })
   
   # Trait summaries (for ordering traits, and summary table)
-  traitsum <- reactive({
-    readRDS("traitsum.rds")
-  })
   dataset <- reactive({
-    readRDS(paste0(req(input$datatype), ".rds")) %>%
-      select(strain, number, sex, diet, trait, value)
+    req(input$datatype)
+    traitdata %>%
+      filter(datatype %in% input$datatype)
   })
   traitarrange <- reactive({
-    req(traitsum(), input$order, input$datatype)
-    out <- traitsum() %>%
-      filter(datatype == input$datatype)
+    req(input$order, input$datatype)
+    out <- traitsumdata %>%
+      filter(datatype %in% input$datatype)
     switch(input$order,
            variability = 
              out %>%
@@ -187,7 +190,8 @@ server <- function(session, input, output) {
       theme(legend.position = "none",
             axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
       ylab(ifelse(ltrait == 1, input$trait, "Trait Value")) +
-      ggtitle(paste0(input$datatype, " data for trait",
+      ggtitle(paste0(paste(input$datatype, collapse = ","),
+                     " data for trait",
                      ifelse(ltrait > 1, "s ", " "),
                      paste(abbreviate(input$trait, ceiling(60 / ltrait)),
                            collapse = ", ")))
@@ -201,7 +205,8 @@ server <- function(session, input, output) {
   })
   output$downloadPlotUI <- renderUI({
     ltrait <- length(req(input$trait))
-    filename <- paste0(req(input$datatype), "_",
+    filename <- paste0(paste(req(input$datatype), collapse = "."),
+                       "_",
                        paste(abbreviate(input$trait, ceiling(60 / ltrait)),
                              collapse = "."))
     fluidRow(

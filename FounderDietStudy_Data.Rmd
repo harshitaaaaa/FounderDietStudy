@@ -284,3 +284,17 @@ saveRDS(traitsum, "traitsum.rds")
 ```{r}
 write_csv(traitsum, "trait_summary.csv")
 ```
+
+```{r}
+traits <- bind_rows(
+  physio = readRDS("physio.rds") %>%
+    mutate(number = as.character(number)) %>%
+    select(trait, strain, number, sex, diet, trait, value),
+  plasma = readRDS("plasma.rds") %>%
+    select(trait, strain, number, sex, diet, trait, value),
+  liver = readRDS("liver.rds") %>%
+    select(trait, strain, number, sex, diet, trait, value),
+  .id = "datatype")
+saveRDS(traits, "traits.rds")
+```
+
