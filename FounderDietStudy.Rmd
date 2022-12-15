@@ -11,7 +11,7 @@ params:
     choices: [physio, plasma, liver]
   traits:
     label: "Number of traits"
-    value: 2
+    value: 3
     input: slider
     min: 2
     max: 6
@@ -30,9 +30,10 @@ library(readr)
 ```
 
 ```{r}
-meas <- readRDS(paste0(params$dataset, ".rds"))
+meas <- readRDS("traits.rds") %>%
+  filter(datatype %in% params$dataset)
 measum <- readRDS("traitsum.rds") %>%
-  filter(datatype == params$dataset) %>%
+  filter(datatype %in% params$dataset) %>%
   arrange(strain.sex.diet)
 ```
 
@@ -55,8 +56,9 @@ ggplot(meas %>%
 
 ```{r}
 dat <- meas %>%
-        select(strain, number, sex, diet, trait, value) %>%
-        pivot_wider(names_from = "trait", values_from = "value")
+  filter(trait %in% traits[1:2]) %>%
+  select(strain, number, sex, diet, trait, value) %>%
+  pivot_wider(names_from = "trait", values_from = "value")
 load("data/CCcolors.RData")
 plotly::ggplotly(
   ggplot(dat) +
@@ -64,5 +66,63 @@ plotly::ggplotly(
     geom_smooth(method = "lm", se = FALSE) +
     geom_point(size = 2) +
     scale_color_manual(values = CCcolors) +
-    facet_grid(sex ~ diet)) 
+    facet_grid(sex ~ diet, scales = "free")) 
 ```
+
+## More than two pairs
+
+This works for 3 but gets crowded for more
+
+```{r}
+traitpairs <- as.data.frame(combn(traits, 2))
+dat <- 
+  bind_rows(
+    map(
+      traitpairs,
+      function(x) {
+        meas %>%
+          filter(trait %in% x) %>%
+          mutate(trait = c("left","right")[match(trait, x)]) %>%
+          select(strain, number, sex, diet, trait, value) %>%
+          pivot_wider(names_from = "trait", values_from = "value")
+      }),
+    .id = "pair") %>%
+  unite(sex_diet, sex, diet) %>%
+  mutate(pair1 = as.matrix(traitpairs)[1, pair],
+         pair2 = as.matrix(traitpairs)[2, pair]) %>%
+  select(pair1, pair2, everything())
+
+plotly::ggplotly(
+  ggplot(dat) +
+    aes(left, right, color = strain) +
+    geom_smooth(method = "lm", se = FALSE) +
+    geom_point(size = 2) +
+    scale_color_manual(values = CCcolors) +
+    facet_grid(pair2 + pair1 ~ sex_diet, scales = "free"))
+```
+
+## Other ideas
+
+Replaced variability in order (which does not really work) with
+p_overall something like `broom::tidy(stats::anova(fitfull, fitred))`
+where fitfull has model 
+
+`trait ~ strain * sex * diet`
+
+and fitred has model
+
+`trait ~ strain + sex * diet`
+
+That is, we remove overall strain effect but combine `strain:sex`, `strain:diet` and `strain:sex:diet`.
+
+```{r}
+tmp <- meas %>% filter(trait == traits[1])
+formful <- formula(value ~ strain * sex * diet)
+fitful <- stats::lm(formful, tmp)
+formred <- formula(value ~ strain + sex * diet)
+fitred <- stats::lm(formred, tmp)
+      
+(broom::tidy(stats::anova(fitred, fitful)) %>%
+  select(p.value))[2,]
+```
+
