@@ -34,6 +34,14 @@ See the QC Analysis Report on liver RNAseq data (in zip file under folder `Liver
 
 ```{r}
 broomit <- function(traitsdata) {
+  overallfit <- function(traitdata) {
+    formful <- formula(value ~ strain * sex * diet)
+    formred <- formula(value ~ strain * sex + sex * diet)
+    fitful <- stats::lm(formful, traitdata)
+    fitred <- stats::lm(formred, traitdata)
+    ((broom::tidy(stats::anova(fitred, fitful)) %>%
+        select(p.value))[2,])$p.value
+  }
   map(
     split(traitsdata, traitsdata$trait),
     function(traitdata) {
@@ -47,6 +55,7 @@ broomit <- function(traitsdata) {
       fit <- stats::lm(form, traitdata)
       as.tibble(data.frame(
         rawSD = sd(traitdata$value, na.rm = TRUE),
+        overall = overallfit(traitdata),
         broom::tidy(stats::drop1(fit, fit, test = "F")) %>%
           filter(grepl("strain:", term)) %>%
           select(term, p.value) %>%

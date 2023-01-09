@@ -32,11 +32,11 @@ ui <- fluidPage(
           shiny::column(
             4,
             selectInput("order", "Order traits by",
-                        c("p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
-                        "p_sex_diet")),
+                        c("p_overall", "p_sex_diet", "p_diet", "p_sex", "variability", "alphabetical", "original"),
+                        "p_overall")),
           shiny::column(
             4,
-            radioButtons("facet","Facet by", c("strain","sex_diet"), "strain", inline = TRUE))),
+            radioButtons("facet","Facet by", c("sex_diet", "strain"), "sex_diet", inline = TRUE))),
         uiOutput("strains"),
         sliderInput("height", "Plot height (in):", 3, 10, 6, step = 1),
         uiOutput("downloadPlotUI"),
@@ -51,8 +51,7 @@ ui <- fluidPage(
     
     # Main panel for displaying outputs ----
     mainPanel(
-      uiOutput("outs"),
-      uiOutput("scatPlot")
+      uiOutput("outs")
     )
   )
 )
@@ -102,6 +101,9 @@ server <- function(session, input, output) {
              arrange(trait),
            original = 
              out,
+           p_overall = 
+             out %>% 
+             arrange(overall),
            p_sex = 
              out %>% 
              arrange(strain.sex),
@@ -147,10 +149,13 @@ server <- function(session, input, output) {
   # Output: Plots or Data
   output$outs <- shiny::renderUI({
     shiny::tagList(
-      shiny::radioButtons("button", "", c("Plots", "Data Means", "Data Summary"), "Plots", inline = TRUE),
+      shiny::radioButtons("button", "", c("Plots", "Pair Plots", "Data Means", "Data Summary"), "Plots", inline = TRUE),
       shiny::conditionalPanel(
         condition = "input.button == 'Plots'",
         shiny::uiOutput("plots")),
+      shiny::conditionalPanel(
+        condition = "input.button == 'Pair Plots'",
+        shiny::uiOutput("scatPlot")),
       shiny::conditionalPanel(
         condition = "input.button == 'Data Means'",
         DT::dataTableOutput("datatable")),
@@ -271,49 +276,60 @@ server <- function(session, input, output) {
   
   output$pair <- renderUI({
     req(input$trait)
-    if(length(input$trait) > 1) {
-      selectInput("pair", "Select pair for scatterplots",
-                  choices = input$trait, selected = input$trait[1:2],
-                  multiple = TRUE)
-    }
-  })
-  scatdata <- reactive({
-    req(input$trait, datatraitslong(), input$pair)
-    if(length(input$pair) < 2) {
+    if(length(input$trait) < 2)
       return(NULL)
-    } else {
-      traitpair <- rep(input$pair, length = 2)
-    }
-    dat <- datatraitslong() %>%
-      filter(trait %in% traitpair) %>%
-      select(strain, number, sex, diet, trait, value) %>%
-      pivot_wider(names_from = "trait", values_from = "value")
+    choices <- as.data.frame(combn(input$trait, 2)) %>%
+      mutate(across(
+        everything(), 
+        function(x) {
+          c(paste(x, collapse = " ON "),
+            paste(rev(x), collapse = " ON "))
+        })) %>%
+      unlist() %>%
+      as.vector()
+    
+    selectInput("pair", "Select pairs for scatterplots",
+                choices = choices, selected = choices[1],
+                multiple = TRUE, width = '100%')
   })
   output$scatPlot <- renderUI({
     req(input$trait, input$datatype, input$order)
     tagList(
       uiOutput("pair"),
-      plotly::plotlyOutput("scatplot")
+      plotOutput("scatplot", height = paste0(input$height, "in"))
     )
   })
-  output$scatplot <- plotly::renderPlotly({
-    req(scatdata(), input$pair)
-    if(is.null(scatdata())) {
+  output$scatplot <- renderPlot({
+    req(input$trait, datatraitslong(), input$pair)
+    if(!isTruthy(input$pair)) {
       return(ggplot())
     }
-    if(!all(input$pair[1:2] %in% names(scatdata()))) {
-       return(ggplot())
-    }
-    plotly::ggplotly(
-      ggplot(scatdata()) +
-        aes(.data[[input$pair[1]]], .data[[input$pair[2]]],
-            color = strain) +
-        geom_smooth(method = "lm", se = FALSE) +
-        geom_point(size = 2) +
-        scale_color_manual(values = CCcolors) +
-        facet_grid(sex ~ diet))
+    
+    dat <- 
+      map(
+        input$pair,
+        function(x) {
+          # Split trait pair by colon
+          x <- str_split(x, " ON ")[[1]][2:1]
+          # create out with columns for each trait pair
+          out <- datatraitslong() %>%
+            filter(trait %in% x) %>%
+            mutate(trait = c(x[1],x[2])[match(trait, x)]) %>%
+            select(strain, number, sex, diet, trait, value) %>%
+            pivot_wider(names_from = "trait", values_from = "value") %>%
+            unite(sex_diet, sex, diet)
+          # create plot
+          ggplot(out) +
+            aes(.data[[x[1]]], .data[[x[2]]], fill = strain, col = strain) +
+            geom_smooth(method = "lm", se = FALSE, formula = "y ~ x") +
+            geom_point(size = 3, shape = 21, color = "black", alpha = 0.65) +
+            scale_color_manual(values = CCcolors) +
+            facet_grid(. ~ sex_diet) +
+            theme(legend.position = "none")
+        })
+    # Patch plots together by rows
+    patchwork::wrap_plots(dat, nrow = length(dat))
   })
-  
 }
 
 shiny::shinyApp(ui = ui, server = server)
