@@ -162,6 +162,38 @@ formred <- formula(value ~ strain * sex + sex * diet)
 fitred <- stats::lm(formred, tmp)
       
 (broom::tidy(stats::anova(fitred, fitful)) %>%
-  select(p.value))[2,]
+  select(p.value))[2,]$p.value
 ```
 
+```{r}
+rr <- resid(fitred)
+```
+
+# Residual from Reduced fit for Dimension Reduction
+
+```{r}
+physio <- readRDS("physio.rds")
+```
+
+```{r}
+out <- residit(physio)
+```
+
+Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
+That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+
+```{r}
+cors <- out %>%
+  select(-value) %>%
+  pivot_wider(names_from = "trait", values_from = "residred") %>%
+  select(-strain, -number, -sex, -diet) %>%
+  cor(use = "pairwise", method = "spearman")
+```
+
+May want to eliminate some with low correlation
+
+```{r}
+summary(apply(cors, 1, function(x) max(x[x<1], na.rm = TRUE)))
+```
+
+Or otherwise use ideas like WCGNA / clustering to find similar traits.
