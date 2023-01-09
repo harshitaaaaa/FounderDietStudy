@@ -275,6 +275,7 @@ server <- function(session, input, output) {
   )
   
   output$pair <- renderUI({
+    # Somehow when input$height is changed this is reset.
     req(input$trait)
     if(length(input$trait) < 2)
       return(NULL)
