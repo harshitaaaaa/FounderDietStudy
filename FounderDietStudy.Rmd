@@ -20,13 +20,20 @@ params:
 
 ```{r setup, include=FALSE, echo = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
-                      comment = "", fig.width = 7, fig.height = 7)
+                      comment = "", fig.height = 7, fig.width = 7)
 ```
 
 ```{r}
 library(tidyverse)
 library(readxl)
 library(readr)
+library(foundr) # github/byandell/foundr
+```
+
+```{r}
+CCcolors <- c("#F0E442", "#555555", "#E69F00", "#0072B2",
+              "#56B4E9", "#009E73", "#D55E00", "#CC79A7")
+names(CCcolors) <- c("AJ", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB")
 ```
 
 ```{r}
@@ -34,7 +41,7 @@ meas <- readRDS("traits.rds") %>%
   filter(datatype %in% params$dataset)
 measum <- readRDS("traitsum.rds") %>%
   filter(datatype %in% params$dataset) %>%
-  arrange(strain.sex.diet)
+  arrange(p_sex_diet)
 ```
 
 ```{r}
@@ -45,12 +52,19 @@ meas <- meas %>%
 
 Here we pick out 6 compounds with the lowest absolute value and compares sex, diet and strain.
 
+```{r}
+strainplot(meas %>%
+         unite(sex_diet, sex, diet))
+```
+
 ```{r warnings = FALSE}
+condition <- "sex_diet"
+form <- formula(".data$trait ~ .data$strain")
 ggplot(meas %>%
          unite(sex_diet, sex, diet)) +
-  aes(sex_diet, value, col = sex_diet) +
+  aes(sex_diet, value, col = .data[[condition]]) +
   geom_jitter() +
-  facet_grid(trait ~ strain, scales = "free_y") +
+  facet_grid(form, scales = "free_y") +
   theme(legend.position = "none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
@@ -143,12 +157,12 @@ patchwork::wrap_plots(dat[tmp], nrow = length(tmp))
 ## Other ideas
 
 Replaced variability in order (which does not really work) with
-p_overall something like `broom::tidy(stats::anova(fitfull, fitred))`
-where fitfull has model 
+`p_signal` something like `broom::tidy(stats::anova(fitfull, fitred))`
+where `fitfull` has model 
 
 `trait ~ strain * sex * diet`
 
-and fitred has model
+and `fitred` has model
 
 `trait ~ strain * se + sex * diet`
 
@@ -169,31 +183,636 @@ fitred <- stats::lm(formred, tmp)
 rr <- resid(fitred)
 ```
 
-# Residual from Reduced fit for Dimension Reduction
+### p-value exploration
 
 ```{r}
-physio <- readRDS("physio.rds")
+traitsum <- readRDS("traitsum.rds")
 ```
 
 ```{r}
-out <- residit(physio)
+logpval <- function(x) pmin(5, -log10(x))
+ggplot(traitsum %>% arrange(p_signal)) +
+  aes(logpval(p_diet), logpval(p_sex_diet), col = logpval(p_signal)) +
+  geom_point(alpha = 0.75, shape = 21) +
+  geom_smooth() +
+  facet_wrap(~ datatype, scales = "free") +
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+```{r}
+pvals <- traitsum %>%
+  select(-rawSD) %>%
+  pivot_longer(-(datatype:trait), values_to = "pvalue", names_to = "term")
+```
+
+```{r}
+ggplot(pvals) +
+  aes(pvalue, col = datatype) +
+  geom_density() +
+  facet_grid(. ~ term)
+```
+
+
+# Residual from Reduced fit for Dimension Reduction
+
+### Compare raw and adjusted correlations
+
+```{r}
+plasma <- readRDS("traits.rds") %>%
+  filter(datatype == "plasma")
+```
+
+```{r}
+if(file.exists(filerds <- "plasmasignal.rds")) {
+  out <- readRDS(filerds)
+} else {
+  out <- partition(plasma)
+  saveRDS(out, filerds)
+}
+```
+
+```{r}
+outv <- 
+  left_join(
+    plasma %>% select(-datatype),
+    out,
+    by = c("trait", "strain", "sex"))
+```
+
+```{r}
+corval <- 
+  bind_rows(
+    map(
+    split(outv, outv$trait),
+    function(x) {
+      terms <- c("signal","mean")
+      as.data.frame(cor(x[,"value"], x[,terms], use = "pair"))
+    }),
+    .id = "trait")
+apply(corval[,-1], 2, summary)
+```
+
+Pattern below makes sense because `mean` captures most of `value`, so their correlations range up toward 1. The `signal` has no clear pattern of correlation with `value`. However, `signal` is that part of the `value` consists of the terms `strain:diet` and `strain:diet:sex`, the important part of the signal.
+
+```{r}
+GGally::ggpairs(corval[,-1])
+```
+
+
+Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
+That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+
+```{r}
+corsraw <- abscorcalc(plasma)
+cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
+```
+
+```{r}
+tmp <- (traitsum %>% filter(datatype == "plasma"))$p_signal
+xcol <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
+xcol <- xcol[upper.tri(xcol)]
+ycol <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
+ycol <- ycol[upper.tri(ycol)]
+```
+
+```{r}
+dat <- data.frame(raw = corsraw[upper.tri(corsraw)],
+                  adj = cors[upper.tri(cors)]) %>%
+  mutate(adjgrp = 1 + pmin(3, floor(raw * 4)),
+         xcol = xcol,
+         ycol = ycol,
+         logpval = pmin(5, -log10(pmin(xcol, ycol))),
+         logpmax = pmin(5, -log10(pmax(xcol, ycol))))
+```
+
+This shows essentially no correlation between raw and adjusted correlations until the raw are fairly large (>0.75). Also, 
+
+```{r}
+ggplot(dat %>%
+  arrange(logpval)) +
+  aes(raw, adj, color = logpval) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  facet_wrap(~ adjgrp, scales = "free_x") +
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+```{r}
+ggplot(dat %>% arrange(logpmax)) +
+  aes(raw, adj, color = logpmax) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  facet_wrap(~ adjgrp, scales = "free_x") +
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+```{r}
+datsub <- dat %>%
+  mutate(index = row_number()) %>%
+  filter(adj > 0.9 | raw > 0.9) %>%
+  filter(adj - raw == max(adj - raw) |
+           adj - raw == min(adj - raw))
+```
+
+```{r}
+rr <- row(cors)[upper.tri(cors)][datsub$index]
+cc <- col(cors)[upper.tri(cors)][datsub$index]
+rbind(
+  cors[rr,cc],
+  corsraw[rr,cc])
+traits <- unique(out$trait)
+datsub$trait_adj <- traits[rr]
+datsub$trait_raw <- traits[cc]
+datsub <- datsub %>%
+  select(trait_raw, trait_adj, everything())
+datsub
+```
+
+```{r}
+ggplot(
+  out %>%
+    filter(trait %in% c(datsub$trait_raw[1], datsub$trait_adj[1])) %>%
+    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
+    pivot_wider(names_from = "trait", values_from = "value") %>%
+    rename(x = datsub$trait_raw[1],
+           y = datsub$trait_adj[1])) +
+  aes(x, y, fill = strain) +
+  geom_point(
+    ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
+  ggplot2::scale_shape_manual(values = c(23, 22)) +
+  ggplot2::scale_fill_manual(values = CCcolors) +
+  facet_wrap(~ sex + diet) +
+  xlab(datsub$trait_raw[1]) +
+  ylab(datsub$trait_adj[1]) +
+  ggtitle(paste("raw cor", round(datsub$raw[1], 2),
+                ", adj cor", round(datsub$adj[1], 2))) +
+  theme(legend.position = "none")
+```
+
+```{r}
+ggplot(
+  out %>%
+    filter(trait %in% c(datsub$trait_raw[2], datsub$trait_adj[2])) %>%
+    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
+    pivot_wider(names_from = "trait", values_from = "value") %>%
+    rename(x = datsub$trait_raw[2],
+           y = datsub$trait_adj[2])) +
+  aes(x, y, fill = strain) +
+  geom_point(
+    ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
+  ggplot2::scale_shape_manual(values = c(23, 22)) +
+  ggplot2::scale_fill_manual(values = CCcolors) +
+  facet_wrap(~ sex + diet) +
+  xlab(datsub$trait_raw[2]) +
+  ylab(datsub$trait_adj[2]) +
+  ggtitle(paste("raw cor", round(datsub$raw[2], 2),
+                ", adj cor", round(datsub$adj[2], 2))) +
+  theme(legend.position = "none")
+```
+
+```{r}
+tmp <- (traitsum %>% filter(datatype == "plasma"))$trait
+trait1 <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
+trait1 <- trait1[upper.tri(trait1)]
+trait2 <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
+trait2 <- trait2[upper.tri(trait2)]
+dat2 <- dat %>%
+  mutate(trait1 = paste0("plasma:", trait1),
+         trait2 = paste0("plasma:", trait2)) %>%
+  filter(logpmax > 3, adj > 0.5) %>%
+  select(trait1, trait2, everything()) %>%
+  rename(pval1 = "xcol", pval2 = "ycol")
+```
+
+### working app for pairs of traits
+
+Need to automate in various ways, such as datatype.
+Also think about same:same and same:other correlations across datatypes.
+
+```{r}
+plotly::ggplotly(
+  ggplot(dat2) +
+    aes(raw, adj, color = logpmax,
+        trait1 = trait1, trait2 = trait2, pval1 = pval1, pval2 = pval2) +
+    geom_abline(slope = 1, intercept = 0, col = "darkgray") +
+    geom_hline(yintercept = 0.5, col = "darkgray") +
+    geom_point(size = 2) +
+    geom_smooth() + 
+    scale_colour_gradientn(colours=rainbow(4)) +
+    ggtitle("plasma: adj cor > 0.5, -log p-value > 3"))
+```
+
+Traits that have strong `strain*diet` signal and are strongly correlated with at least one other strong trait.
+
+```{r}
+traits <- sort(unique(c(dat2$trait1, dat2$trait2)))
+```
+
+#### Correlation of raw and adjusted values
+
+```{r}
+rawadj <- out %>%
+  group_by(trait) %>%
+  summarize(rawadj = cor(value, signal, use = "pairwise.complete.obs"),
+            .groups = "drop") %>%
+  ungroup
+```
+
+```{r}
+summary(rawadj$rawadj)
+```
+
+```{r}
+rawadj <- left_join(
+  rawadj,
+  traitsum %>% filter(datatype == "plasma"),
+  by = "trait")
+```
+
+```{r}
+ggplot(rawadj) +
+  aes(-log10(p_signal), rawadj) +
+  geom_point(size = 3)
+```
+
+# Analysis over time
+
+```{r}
+consumed <- colnames(cors)[grep("consumed", colnames(cors))]
+bw <- colnames(cors)[grep("BW", colnames(cors))]
+gtt <- colnames(cors)[grep("GTT", colnames(cors))]
+```
+
+```{r}
+physiosum <- (traitsum %>% filter(datatype == "physio"))
+```
+
+## Body Weight (BW)
+
+```{r}
+bwsum <- physiosum %>%
+  filter(trait %in% bw, grepl("wk$", trait)) %>%
+  mutate(trait = as.numeric(str_remove(str_remove(trait, "^BW_"), "wk$"))) %>%
+  rename(week = "trait") %>%
+  select(-datatype, -rawSD, -strain.sex) %>%
+  pivot_longer(-week, names_to = "term", values_to = "pvalue") %>%
+  mutate(pvalue = -log10(pvalue)) %>%
+  arrange(term, week)
+```
+
+```{r}
+ggplot(bwsum) +
+  aes(week, pvalue, col = term) +
+  geom_point() +
+  geom_path()
+```
+
+```{r}
+outbw <- out %>%
+  filter(trait %in% bw, grepl("wk$", trait)) %>%
+  mutate(trait = as.numeric(str_remove(str_remove(trait, "^BW_"), "wk$"))) %>%
+  rename(week = "trait")
+```
+
+```{r}
+ggplot_time(outbw)
+```
+
+```{r}
+ggplot_time(outbw %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
+```
+
+## Kcal consumed
+
+```{r}
+kcsum <- physiosum %>%
+  filter(trait %in% consumed, grepl("^kcal_", trait)) %>%
+  mutate(trait = as.numeric(str_remove(str_remove(trait, "^kcal_consumed_"), "wk$"))) %>%
+  rename(week = "trait") %>%
+  select(-datatype, -rawSD, -strain.sex) %>%
+  pivot_longer(-week, names_to = "term", values_to = "pvalue") %>%
+  mutate(pvalue = -log10(pvalue)) %>%
+  arrange(term, week)
+```
+
+```{r}
+ggplot(kcsum) +
+  aes(week, pvalue, col = term) +
+  geom_point() +
+  geom_path()
+```
+
+
+```{r}
+outkcal <- out %>%
+  filter(trait %in% consumed, grepl("^kcal_", trait)) %>%
+  mutate(trait = as.numeric(str_remove(str_remove(trait, "^kcal_consumed_"), "wk$"))) %>%
+  rename(week = "trait")
+```
+
+```{r}
+ggplot_time(outkcal)
+```
+
+```{r}
+ggplot_time(outkcal %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
+```
+
+## GTT consumed
+
+```{r}
+gttsum <- physiosum %>%
+  filter(trait %in% gtt, grepl("^GTT_", trait)) %>%
+  mutate(trait = str_remove(str_remove(trait, "^GTT_"), "wk$"),
+         week = as.numeric(str_remove(trait, ".*_")),
+         dose = as.numeric(str_remove(str_remove(trait, "^[a-z]*_"), "_[0-9]*$")),
+         trait = str_remove(trait, "_.*$")) %>%
+  select(-datatype, -rawSD, -strain.sex) %>%
+  select(trait, week, dose, everything()) %>%
+  pivot_longer(-(trait:dose), names_to = "term", values_to = "pvalue") %>%
+  mutate(pvalue = -log10(pvalue)) %>%
+  arrange(term, dose, week)
+```
+
+```{r}
+ggplot(gttsum %>% filter(trait == "glu")) +
+    aes(dose, pvalue, col = term) +
+    geom_point(size = 2) +
+    geom_smooth(se = FALSE) +
+    facet_grid(. ~ week) +
+  ggtitle("GTT glucose log10 pvalues")
+```
+
+```{r}
+ggplot(gttsum %>% filter(trait != "glu")) +
+    aes(dose, pvalue, col = term) +
+    geom_point(size = 2) +
+    geom_smooth(se = FALSE) +
+    facet_wrap(~ trait) +
+  ggtitle("GTT cpep and ins log10 pvalues")
+```
+
+
+```{r}
+outgtt <- out %>%
+  filter(trait %in% gtt, grepl("^GTT_", trait)) %>%
+  mutate(trait = str_remove(str_remove(trait, "^GTT_"), "wk$"),
+         week = as.numeric(str_remove(trait, ".*_")),
+         dose = as.numeric(str_remove(str_remove(trait, "^[a-z]*_"), "_[0-9]*$")),
+         trait = str_remove(trait, "_.*$"))
+```
+
+```{r}
+ggplot(outgtt %>% filter(trait == "glu") %>% unite("sex_diet", sex, diet)) +
+    aes(dose, value, fill = strain, color = strain) +
+    geom_jitter(shape = 21, size = 2, color = "black") +
+    geom_smooth(se = FALSE) +
+    facet_grid(week ~ sex_diet) +
+    scale_color_manual(values = CCcolors) +
+    scale_fill_manual(values = CCcolors)
+```
+
+```{r}
+ggplot(outgtt %>% select(-value, -ancillary, -noise) %>% rename(value = "signal") %>%
+         filter(trait == "glu") %>% unite("sex_diet", sex, diet)) +
+    aes(dose, value, fill = strain, color = strain) +
+    geom_jitter(shape = 21, size = 2, color = "black") +
+    geom_smooth(se = FALSE) +
+    facet_grid(week ~ sex_diet) +
+    scale_color_manual(values = CCcolors) +
+    scale_fill_manual(values = CCcolors)
+```
+
+```{r}
+ggplot(outgtt %>% filter(trait != "glu") %>% unite("sex_diet", sex, diet)) +
+    aes(dose, value, fill = strain, color = strain) +
+    geom_jitter(shape = 21, size = 2, color = "black") +
+    geom_smooth(se = FALSE) +
+    facet_grid(trait ~ sex_diet, scales = "free_y") +
+    scale_color_manual(values = CCcolors) +
+    scale_fill_manual(values = CCcolors)
+```
+
+```{r}
+ggplot(outgtt %>% select(-value, -ancillary, -noise) %>% rename(value = "signal")
+       %>% filter(trait != "glu") %>% unite("sex_diet", sex, diet)) +
+    aes(dose, value, fill = strain, color = strain) +
+    geom_jitter(shape = 21, size = 2, color = "black") +
+    geom_smooth(se = FALSE) +
+    facet_grid(trait ~ sex_diet, scales = "free_y") +
+    scale_color_manual(values = CCcolors) +
+    scale_fill_manual(values = CCcolors)
+```
+
+
+# Clustering and other methods for dimension reduction of multiple traits
+
+WCGNA / clustering to find similar traits.
+
+Strategy:
+
+- use all data or prescreen in some way (based on p_signal?)
+- group by names/types (for physio) or automate
+- how to find representer for groups of traits
+- making sense of representer back to traits?
+
+Operations:
+
+- raw vs adj values
+- use `scale()` to standardized a matrix with data in columns
+- create some `dist()` object, probably using "euclidean" metric
+- decide on number of clusters
+- find representer (eigenvector) for clusters
+
+**need to add how many traits in each group**
+
+#### Clustering for physio
+
+```{r}
+d <- 1 - cors^2
+fit <- hclust(as.dist(d), method="ward.D2")
+plot(fit) # display dendogram
+```
+
+
+```{r}
+d <- 1 - corsraw^2
+fit <- hclust(as.dist(d), method="ward.D2")
+plot(fit) # display dendogram
+```
+
+
+#### Biplot
+
+Physio traits
+
+```{r}
+outr <- out %>% 
+  select(-value, -ancillary, -noise) %>%
+  rename(value = "signal")
+```
+
+Notice two major axes for consumed.
+
+```{r}
+biggplot(biplot_pca(biplot_data(outr, consumed))) +
+  ggtitle("consumed")
+```
+
+Less clear signal for body weight.
+
+```{r}
+biggplot(biplot_pca(biplot_data(outr, bw))) +
+  ggtitle("Body Weight")
+```
+
+
+The following shows GTT measures for insulin and glucose are orthogonal.
+
+```{r}
+biggplot(biplot_pca(biplot_data(outr, gtt))) +
+  ggtitle("GTT")
+```
+
+Percent variation by PC component.
+
+```{r}
+biplot_pca(biplot_data(outr, gtt)) -> tmp
+100* tmp$sdev^2/sum(tmp$sdev^2)
+```
+
+factor loadings
+
+```{r}
+round(tmp$loadings[,1:3], 2)
+```
+
+## Clustering for plasma
+
+```{r}
+plasmasum <- readRDS("traitsum.RDS") %>%
+  filter(datatype == "plasma",
+         p_signal < 0.01) # restrict to traits with strong strain*diet signals
+```
+
+```{r}
+outma <- partition(readRDS("plasma.RDS")) %>%
+  select(names(out)) %>%
+  filter(trait %in% plasmasum$trait)
 ```
 
 Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
 That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
 
 ```{r}
-cors <- out %>%
-  select(-value) %>%
-  pivot_wider(names_from = "trait", values_from = "residred") %>%
-  select(-strain, -number, -sex, -diet) %>%
-  cor(use = "pairwise", method = "spearman")
+corsmaraw <- abscorcalc(outma %>% select(-signal, -ancillary, -noise))
+corsma <- abscorcalc(outma %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
 ```
-
-May want to eliminate some with low correlation
 
 ```{r}
-summary(apply(cors, 1, function(x) max(x[x<1], na.rm = TRUE)))
+d <- 1 - corsma^2
+fit <- hclust(as.dist(d), method="ward.D2")
+plot(fit) # display dendogram
 ```
 
-Or otherwise use ideas like WCGNA / clustering to find similar traits.
+```{r}
+groups <- cutree(fit, 4)
+```
+
+```{r}
+outmar <- outma %>% 
+  select(-value, -ancillary, -noise) %>%
+  rename(value = "signal")
+```
+
+```{r}
+pca <- list()
+for(i in 1:4) {
+  pca[[i]] <- biplot_pca(biplot_data(outmar, names(groups[groups == i])))
+}
+```
+
+```{r}
+tmp <- as.data.frame(lapply(pca, function(x) round(100* (x$sdev^2)[1:3] / sum(x$sdev^2), 2)))
+names(tmp) <- seq_along(tmp)
+tmp
+```
+
+```{r}
+p <- list()
+for(i in 1:4) {
+  p[[i]] <- biggplot(pca[[i]]) +
+    ggtitle(paste("plasma group", i))
+}
+```
+
+```{r fig.length = 7}
+patchwork::wrap_plots(p, nrow = length(p))
+```
+
+## Clustering for liver
+
+```{r}
+liversum <- readRDS("traitsum.RDS") %>%
+  filter(datatype == "liver",
+         p_signal < 0.0001) # restrict to traits with strong strain*diet signals
+```
+
+```{r}
+outli <- partition(readRDS("liver.RDS")) %>%
+  select(names(out)) %>%
+  filter(trait %in% liversum$trait)
+```
+
+Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
+That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+
+```{r}
+corsli <- abscorcalc(outli %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
+```
+
+```{r}
+d <- 1 - corsli^2
+fit <- hclust(as.dist(d), method="ward.D2")
+plot(fit) # display dendogram
+```
+
+```{r}
+groups <- cutree(fit, 4)
+```
+
+```{r}
+outlir <- outli %>% 
+  select(-value, -ancillary, -noise) %>%
+  rename(value = "signal")
+```
+
+```{r}
+pcali <- list()
+for(i in 1:4) {
+  pcali[[i]] <- biplot_pca(biplot_data(outlir, names(groups[groups == i])))
+}
+```
+
+```{r}
+tmp <- as.data.frame(lapply(pcali, function(x) round(100* (x$sdev^2)[1:3] / sum(x$sdev^2), 2)))
+names(tmp) <- seq_along(tmp)
+tmp
+```
+
+```{r}
+p <- list()
+for(i in seq_along(pcali)) {
+  p[[i]] <- biggplot(pcali[[i]]) +
+    ggtitle(paste("plasma group", i))
+}
+```
+
+```{r fig.length = 7}
+patchwork::wrap_plots(p, nrow = length(p))
+```
+
+## Manova?
+

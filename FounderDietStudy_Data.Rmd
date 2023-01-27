@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 library(tidyverse)
 library(readxl)
 library(readr)
-source("routines.R")
+library(foundr) # github/byandell/foundr
 ```
 
 Data for this repository are identified by `data/source.csv`,
@@ -24,13 +24,13 @@ which is not saved with the repo.
 links <- read_csv(file.path("data", "source.csv"))
 ```
 
-Data comes from Google Drive <`r linkpath("google")`>.
+Data comes from Google Drive <`r linkpath("google", links)`>.
 See the QC Analysis Report on liver RNAseq data (in zip file under folder `Liver RNAseq`).
 
 # Mouse annotations
 
 ```{r}
-annotfile <- linkpath("annot")
+annotfile <- linkpath("annot", links)
 excel_sheets(annotfile)
 annot <- read_excel(annotfile) %>%
   mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
@@ -51,7 +51,7 @@ annot %>%
 # Physiological trait counts by strain, sex, diet
 
 ```{r}
-physiofile <- linkpath("physio")
+physiofile <- linkpath("physio", links)
 excel_sheets(physiofile)
 physiodef <- read_excel(physiofile, sheet = 1, skip = 1) %>%
   unite("comment", -(1:3)) %>%
@@ -100,7 +100,7 @@ rm(physio)
 # Plasma metabolite abundance data
 
 ```{r}
-plasmafile <- linkpath("plasma")
+plasmafile <- linkpath("plasma", links)
 excel_sheets(plasmafile)
 removed <- read_excel(plasmafile, sheet = 1, skip = 4) %>%
   pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
@@ -170,7 +170,7 @@ plasmasum <- plasmasum[m,]
 Note that annotation file relates the number to the sex and diet.
 
 ```{r}
-liverfile <- linkpath("liver")
+liverfile <- linkpath("liver", links)
 liver <- read_csv(liverfile) %>%
   rename(trait = "...1") %>%
   mutate(trait = as.character(trait)) %>%
@@ -180,7 +180,7 @@ liver <- read_csv(liverfile) %>%
 ```
 
 ```{r}
-liver_annot <- linkpath("liver_annot")
+liver_annot <- linkpath("liver_annot", links)
 annot2 <- read_csv(liver_annot)
 ```
 
