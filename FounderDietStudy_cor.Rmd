@@ -143,7 +143,7 @@ datsub <- datsub %>%
   select(traitc, traitr, everything())
 datsub %>%
   rename(cor_raw = "raw", cor_adj = "adj") %>%
-  select(traitc, traitr, pvalr, pvalc, cor_raw, cor_adj) %>%
+  select(traitr, pvalr, traitc, pvalc, cor_raw, cor_adj) %>%
   mutate(across(is.numeric, signif, 3))
 ```
 
