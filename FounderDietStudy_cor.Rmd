@@ -1,0 +1,238 @@
+---
+title: "Founder Diet Study Correlations"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+params:
+  dataset:
+    label: "Measurement Set"
+    value: plasma
+    input: select
+    choices: [physio, plasma, liver]
+  traits:
+    label: "Number of traits"
+    value: 3
+    input: slider
+    min: 2
+    max: 6
+    
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      comment = "", fig.height = 7, fig.width = 7)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(readr)
+library(foundr) # github/byandell/foundr
+```
+
+# Compare raw and adjusted correlations
+
+```{r}
+plasma <- readRDS("traits.rds") %>%
+  filter(datatype == "plasma")
+```
+
+```{r}
+if(file.exists(filerds <- "plasmasignal.rds")) {
+  out <- readRDS(filerds)
+} else {
+  out <- partition(plasma)
+  saveRDS(out, filerds)
+}
+```
+
+```{r}
+outw <- out %>%
+  select(-mean) %>%
+  pivot_wider(names_from = "trait", values_from = "signal")
+write.csv(outw, "plasmasignal.csv", row.names = FALSE)
+```
+
+```{r}
+outv <- 
+  left_join(
+    plasma %>% select(-datatype),
+    out,
+    by = c("trait", "strain", "sex"))
+```
+
+```{r}
+corval <- 
+  bind_rows(
+    map(
+    split(outv, outv$trait),
+    function(x) {
+      terms <- c("signal","mean")
+      as.data.frame(cor(x[,"value"], x[,terms], use = "pair"))
+    }),
+    .id = "trait")
+apply(corval[,-1], 2, summary)
+```
+
+Pattern below makes sense because `mean` captures most of `value`, so their correlations range up toward 1. The `signal` has no clear pattern of correlation with `value`. However, `signal` is that part of the `value` consists of the terms `strain:diet` and `strain:diet:sex`, the important part of the signal.
+
+```{r}
+GGally::ggpairs(corval[,-1])
+```
+
+
+Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
+That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+
+```{r}
+if(file.exists(filerds <- "corsraw.rds")) {
+  corsraw <- readRDS(filerds)
+} else {
+  corsraw <- abscorcalc(plasma)
+  saveRDS(corsraw, filerds)  
+}
+if(file.exists(filerds <- "cors.rds")) {
+  cors <- readRDS(filerds)
+} else {
+  cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
+  saveRDS(cors, filerds)  
+}
+```
+
+```{r}
+traitsum <- readRDS("traitsum.rds")
+tmp <- (traitsum %>% filter(datatype == "plasma"))$p_signal
+pvalr <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
+pvalr <- pvalr[upper.tri(pvalr)]
+pvalc <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
+pvalc <- pvalc[upper.tri(pvalc)]
+```
+
+```{r}
+dat <- data.frame(raw = corsraw[upper.tri(corsraw)],
+                  adj = cors[upper.tri(cors)]) %>%
+  mutate(adjgrp = 1 + pmin(3, floor(raw * 4)),
+         pvalr = -log10(pvalr),
+         pvalc = -log10(pvalc),
+         logpval = pmin(5, pmax(pvalr, pvalc)),
+         logpmax = pmin(5, pmax(pvalr, pvalc)))
+```
+
+Each point is a pair of traits showing their raw and adjusted (signal only) correlations. Coloring is by the most significant `p_signal`
+for the two traits being correlated. This shows essentially no correlation between  until the raw are fairly large (>0.75). 
+
+Find large correlations for `raw` or `adj` and relatively large `logpval` for `p_signal`. Add these to plots of correlations (black circles) and use for pair
+plots below.
+
+```{r}
+datsub <- dat %>%
+  mutate(index = row_number()) %>%
+  filter(adj > 0.8 | raw > 0.8,
+         logpval > 2) %>%
+  filter(adj - raw == max(adj - raw) |
+           adj - raw == min(adj - raw))
+```
+
+```{r}
+rr <- row(cors)[upper.tri(cors)][datsub$index]
+cc <- col(cors)[upper.tri(cors)][datsub$index]
+traits <- unique(out$trait)
+datsub$traitc <- traits[cc]
+datsub$traitr <- traits[rr]
+datsub <- datsub %>%
+  select(traitc, traitr, everything())
+datsub %>%
+  rename(cor_raw = "raw", cor_adj = "adj") %>%
+  select(traitc, traitr, pvalr, pvalc, cor_raw, cor_adj) %>%
+  mutate(across(is.numeric, signif, 3))
+```
+
+```{r}
+p <- ggplot(dat %>%
+  arrange(logpval)) +
+  aes(raw, adj, color = logpval) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  facet_wrap(~ adjgrp, scales = "free_x") +
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+```{r}
+p +
+  geom_point(data = datsub, 
+    aes(x = raw, y = adj), 
+    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
+```
+
+Same plot but coloring by the least significant `p_signal` among a pair of traits.
+
+```{r}
+p <- ggplot(dat %>% arrange(logpmax)) +
+  aes(raw, adj, color = logpmax) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  facet_wrap(~ adjgrp, scales = "free_x") +
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+```{r}
+p +
+  geom_point(data = datsub, 
+    aes(x = raw, y = adj), 
+    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
+```
+
+```{r}
+filter_best <- function(out, traitc, traitr) {
+  out %>%
+    filter(trait %in% c(traitc, traitr)) %>%
+    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
+    pivot_wider(names_from = "trait", values_from = "value") %>%
+    rename(x = traitc,
+           y = traitr)
+}
+```
+
+```{r}
+plot_best <- function(out1, summary_type, datsub) {
+  ggplot(out1 %>% filter(type == summary_type)) +
+    aes(x, y, fill = strain) +
+    geom_smooth(method = "lm", se = FALSE, fill = "white", col = "darkgray", formula = "y ~ x") +
+    geom_point(
+      ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
+    ggplot2::scale_shape_manual(values = c(23, 22)) +
+    ggplot2::scale_fill_manual(values = CCcolors) +
+    facet_wrap(~ sex + diet) +
+    xlab(datsub$traitc) +
+    ylab(datsub$traitr) +
+    ggtitle(paste(
+      summary_type, "for",
+      "raw cor", round(datsub$raw, 2),
+      ", adj cor", round(datsub$adj, 2),
+      ", logpvals", 
+      paste(round(c(datsub$pvalr, datsub$pvalc), 2), collapse = ", "))) +
+    theme(legend.position = "none")
+}
+```
+
+```{r}
+out1 <- filter_best(out, datsub$traitc[1], datsub$traitr[1])
+plot_best(out1, "mean", datsub[1,])
+```
+
+```{r}
+plot_best(out1, "signal", datsub[1,])
+```
+
+```{r}
+out2 <- filter_best(out, datsub$traitc[2], datsub$traitr[2])
+plot_best(out2, "mean", datsub[2,])
+```
+
+```{r}
+plot_best(out2, "signal", datsub[2,])
+```
+
+

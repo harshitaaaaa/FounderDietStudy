@@ -1,7 +1,7 @@
 ---
 title: "Founder Diet Study Data"
 author: "Brian Yandell"
-date: "2022-12-05"
+date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 params:
   dataset:
@@ -263,8 +263,18 @@ Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex
 That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
 
 ```{r}
-corsraw <- abscorcalc(plasma)
-cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
+if(file.exists(filerds <- "corsraw.rds")) {
+  corsraw <- readRDS(filerds)
+} else {
+  corsraw <- abscorcalc(plasma)
+  saveRDS(corsraw, filerds)  
+}
+if(file.exists(filerds <- "cors.rds")) {
+  cors <- readRDS(filerds)
+} else {
+  cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
+  saveRDS(cors, filerds)  
+}
 ```
 
 ```{r}
@@ -308,10 +318,14 @@ ggplot(dat %>% arrange(logpmax)) +
   scale_colour_gradientn(colours=rainbow(4))
 ```
 
+Filter to large correlations for `raw` or `adj`. Note that if we insist that
+`logpval` is large, then both `raw` and `adj` correlations tend to be large.
+
 ```{r}
 datsub <- dat %>%
   mutate(index = row_number()) %>%
-  filter(adj > 0.9 | raw > 0.9) %>%
+  filter(adj > 0.8 | raw > 0.8,
+         logpval > 2) %>%
   filter(adj - raw == max(adj - raw) |
            adj - raw == min(adj - raw))
 ```
@@ -319,36 +333,61 @@ datsub <- dat %>%
 ```{r}
 rr <- row(cors)[upper.tri(cors)][datsub$index]
 cc <- col(cors)[upper.tri(cors)][datsub$index]
-rbind(
-  cors[rr,cc],
-  corsraw[rr,cc])
 traits <- unique(out$trait)
 datsub$trait_adj <- traits[rr]
 datsub$trait_raw <- traits[cc]
 datsub <- datsub %>%
   select(trait_raw, trait_adj, everything())
-datsub
 ```
 
 ```{r}
-ggplot(
+filter_best <- function(out, traitraw, traitadj) {
   out %>%
     filter(trait %in% c(datsub$trait_raw[1], datsub$trait_adj[1])) %>%
     pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
     pivot_wider(names_from = "trait", values_from = "value") %>%
     rename(x = datsub$trait_raw[1],
-           y = datsub$trait_adj[1])) +
-  aes(x, y, fill = strain) +
-  geom_point(
-    ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
-  ggplot2::scale_shape_manual(values = c(23, 22)) +
-  ggplot2::scale_fill_manual(values = CCcolors) +
-  facet_wrap(~ sex + diet) +
-  xlab(datsub$trait_raw[1]) +
-  ylab(datsub$trait_adj[1]) +
-  ggtitle(paste("raw cor", round(datsub$raw[1], 2),
-                ", adj cor", round(datsub$adj[1], 2))) +
-  theme(legend.position = "none")
+           y = datsub$trait_adj[1])
+}
+```
+
+```{r}
+plot_best <- function(out1, summary_type, datsub) {
+  ggplot(out1 %>% filter(type == summary_type)) +
+    aes(x, y, fill = strain) +
+    geom_smooth(method = "lm", se = FALSE, fill = "white", col = "darkgray", formula = "y ~ x") +
+    geom_point(
+      ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
+    ggplot2::scale_shape_manual(values = c(23, 22)) +
+    ggplot2::scale_fill_manual(values = CCcolors) +
+    facet_wrap(~ sex + diet) +
+    xlab(datsub$trait_raw[1]) +
+    ylab(datsub$trait_adj[1]) +
+    ggtitle(paste(
+      summary_type, "for",
+      "raw cor", round(datsub$raw, 2),
+      ", adj cor", round(datsub$adj, 2),
+      ", logpval", round(datsub$logpval, 2))) +
+    theme(legend.position = "none")
+}
+```
+
+```{r}
+out1 <- filter_best(out, datsub$trait_raw[1], datsub$trait_adj[1])
+plot_best(out1, "mean", datsub[1,])
+```
+
+```{r}
+plot_best(out1, "signal", datsub[1,])
+```
+
+```{r}
+out2 <- filter_best(out, datsub$trait_raw[2], datsub$trait_adj[2])
+plot_best(out2, "mean", datsub[2,])
+```
+
+```{r}
+plot_best(out2, "signal", datsub[2,])
 ```
 
 ```{r}
@@ -368,7 +407,8 @@ ggplot(
   xlab(datsub$trait_raw[2]) +
   ylab(datsub$trait_adj[2]) +
   ggtitle(paste("raw cor", round(datsub$raw[2], 2),
-                ", adj cor", round(datsub$adj[2], 2))) +
+                ", adj cor", round(datsub$adj[2], 2),
+                ", logpval", round(datsub$logpval[2], 2))) +
   theme(legend.position = "none")
 ```
 
