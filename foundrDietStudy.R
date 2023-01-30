@@ -29,6 +29,17 @@ foundrScatplot <- function(trait, traitdata, pair) {
         x <- stringr::str_split(x, " ON ")[[1]][2:1]
         # create out with columns for each trait pair
         out <- tidyr::unite(traitdata, sex_diet, sex, diet)
+        # reorganize data
+        out <- 
+          dplyr::filter(
+            tidyr::pivot_wider(
+              dplyr::filter(
+                out,
+                trait %in% c(x[1],x[2])),
+              names_from = "trait", values_from = "value"),
+            # Make sure x and y columns have no missing data.
+            !(is.na(.data[[x[1]]]) | is.na(.data[[x[2]]])))
+        
         # create plot
         foundr::scatplot(out, x[1], x[2], shape_sex = FALSE) +
           ggplot2::facet_grid(. ~ sex_diet)

@@ -99,7 +99,7 @@ if(file.exists(filerds <- "cors.rds")) {
 }
 ```
 
-```{r}
+```{r eval=FALSE}
 traitsum <- readRDS("traitsum.rds")
 tmp <- (traitsum %>% filter(datatype == "plasma"))$p_signal
 pvalr <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
@@ -108,49 +108,106 @@ pvalc <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
 pvalc <- pvalc[upper.tri(pvalc)]
 ```
 
-```{r}
-dat <- data.frame(raw = corsraw[upper.tri(corsraw)],
-                  adj = cors[upper.tri(cors)]) %>%
-  mutate(adjgrp = 1 + pmin(3, floor(raw * 4)),
+```{r eval=FALSE}
+dat <- data.frame(cor_raw = corsraw[upper.tri(corsraw)],
+                  cor_adj = cors[upper.tri(cors)]) %>%
+  mutate(adjgrp = 1 + pmin(3, floor(cor_raw * 4)),
          pvalr = -log10(pvalr),
          pvalc = -log10(pvalc),
-         logpval = pmin(5, pmax(pvalr, pvalc)),
-         logpmax = pmin(5, pmax(pvalr, pvalc)))
+         logpmax = pmin(5, pmax(pvalr, pvalc)),
+         logpmin = pmin(5, pmin(pvalr, pvalc)))
 ```
 
 Each point is a pair of traits showing their raw and adjusted (signal only) correlations. Coloring is by the most significant `p_signal`
 for the two traits being correlated. This shows essentially no correlation between  until the raw are fairly large (>0.75). 
 
-Find large correlations for `raw` or `adj` and relatively large `logpval` for `p_signal`. Add these to plots of correlations (black circles) and use for pair
+Find large correlations for `raw` or `cor_adj` and relatively large `logpmax` for `p_signal`. Add these to plots of correlations (black circles) and use for pair
 plots below.
 
-```{r}
-datsub <- dat %>%
-  mutate(index = row_number()) %>%
-  filter(adj > 0.8 | raw > 0.8,
-         logpval > 2) %>%
-  filter(adj - raw == max(adj - raw) |
-           adj - raw == min(adj - raw))
-```
-
-```{r}
+```{r eval=FALSE}
 rr <- row(cors)[upper.tri(cors)][datsub$index]
 cc <- col(cors)[upper.tri(cors)][datsub$index]
-traits <- unique(out$trait)
-datsub$traitc <- traits[cc]
-datsub$traitr <- traits[rr]
+traits <- as.character(unique(out$trait))
+
+datsub <- dat %>%
+  mutate(index = row_number()) %>%
+  filter(cor_adj > 0.8 | cor_raw > 0.8,
+         logpmax > 2) %>%
+  filter(cor_adj - cor_raw == max(cor_adj - cor_raw) |
+         cor_adj - cor_raw == min(cor_adj - cor_raw))
+```
+
+```{r eval=FALSE}
 datsub <- datsub %>%
-  select(traitc, traitr, everything())
-datsub %>%
-  rename(cor_raw = "raw", cor_adj = "adj") %>%
-  select(traitr, pvalr, traitc, pvalc, cor_raw, cor_adj) %>%
+  mutate(traitc = traits[cc],
+         traitr = traits[rr]) %>%
+  purrr::transpose() %>%
+  purrr::map(function(x) {
+    if(x$pvalc > x$pvalr) {
+      # switch row and columne
+      tmp <- x$traitc
+      x$traitc <- x$traitr
+      x$traitr <- tmp
+      tmp <- x$pvalc
+      x$pvalc <- x$pvalr 
+      x$pvalr <- tmp
+    }
+    x
+  }) %>%
+  purrr::transpose() %>%
+  lapply(unlist) %>%
+  as.data.frame() %>%
+  rename(pvalx = "pvalr",
+         pvaly = "pvalc",
+         traitx = "traitr",
+         traity = "traitc") %>%
+  select(traitx, traity, everything()) %>%
+  select(traitx, pvalx, traity, pvaly, cor_raw, cor_adj) %>%
   mutate(across(is.numeric, signif, 3))
 ```
 
 ```{r}
+plasmasum <- readRDS("traitsum.rds") %>%
+  filter(datatype == "plasma")
+```
+
+```{r}
+dat <- cor_compare(plasmasum, corsraw, cors)
+```
+
+```{r}
+ggplot(dat %>% rename(cor_raw = "cor1", cor_adj = "cor2")) +
+  aes(cor_raw, cor_adj) +
+  geom_hex()
+```
+
+
+```{r}
+ggplot(dat %>%
+         rename(cor_raw = "cor1", cor_adj = "cor2") %>%
+         filter(cor_raw > .75, cor_adj > .75)) +
+  aes(cor_raw, cor_adj) +
+  geom_hex()
+```
+
+```{r}
+ggplot(
+  dat %>%
+    rename(cor_raw = "cor1", cor_adj = "cor2") %>%
+    filter(cor_raw > .75, cor_adj > .75) %>%
+    mutate(logpmax = pmax(logpvalr, logpvalc)) %>%
+    arrange(logpmax)) +
+  aes(cor_raw, cor_adj, color = logpmax) +
+  geom_point() +
+  geom_smooth(col = "black") + 
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+
+```{r eval=FALSE}
 p <- ggplot(dat %>%
-  arrange(logpval)) +
-  aes(raw, adj, color = logpval) +
+  arrange(logpmax)) +
+  aes(cor_raw, cor_adj, color = logpmax) +
   geom_point() +
   geom_hline(yintercept = 0.5, col = "darkgray") +
   geom_smooth(col = "black") + 
@@ -158,18 +215,18 @@ p <- ggplot(dat %>%
   scale_colour_gradientn(colours=rainbow(4))
 ```
 
-```{r}
+```{r eval=FALSE}
 p +
   geom_point(data = datsub, 
-    aes(x = raw, y = adj), 
+    aes(x = cor_raw, y = cor_adj), 
     shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
 ```
 
 Same plot but coloring by the least significant `p_signal` among a pair of traits.
 
-```{r}
-p <- ggplot(dat %>% arrange(logpmax)) +
-  aes(raw, adj, color = logpmax) +
+```{r eval=FALSE}
+p <- ggplot(dat %>% arrange(logpmin)) +
+  aes(cor_raw, cor_adj, color = logpmin) +
   geom_point() +
   geom_hline(yintercept = 0.5, col = "darkgray") +
   geom_smooth(col = "black") + 
@@ -177,62 +234,31 @@ p <- ggplot(dat %>% arrange(logpmax)) +
   scale_colour_gradientn(colours=rainbow(4))
 ```
 
-```{r}
+```{r eval=FALSE}
 p +
   geom_point(data = datsub, 
-    aes(x = raw, y = adj), 
+    aes(x = cor_raw, y = cor_adj), 
     shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
 ```
 
 ```{r}
-filter_best <- function(out, traitc, traitr) {
-  out %>%
-    filter(trait %in% c(traitc, traitr)) %>%
-    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
-    pivot_wider(names_from = "trait", values_from = "value") %>%
-    rename(x = traitc,
-           y = traitr)
-}
+datsub <- cor_extreme(plasmasum, dat)
 ```
 
 ```{r}
-plot_best <- function(out1, summary_type, datsub) {
-  ggplot(out1 %>% filter(type == summary_type)) +
-    aes(x, y, fill = strain) +
-    geom_smooth(method = "lm", se = FALSE, fill = "white", col = "darkgray", formula = "y ~ x") +
-    geom_point(
-      ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
-    ggplot2::scale_shape_manual(values = c(23, 22)) +
-    ggplot2::scale_fill_manual(values = CCcolors) +
-    facet_wrap(~ sex + diet) +
-    xlab(datsub$traitc) +
-    ylab(datsub$traitr) +
-    ggtitle(paste(
-      summary_type, "for",
-      "raw cor", round(datsub$raw, 2),
-      ", adj cor", round(datsub$adj, 2),
-      ", logpvals", 
-      paste(round(c(datsub$pvalr, datsub$pvalc), 2), collapse = ", "))) +
-    theme(legend.position = "none")
-}
+ggplot_extreme(out, "mean", datsub[1,], condition = "sex + diet")
 ```
 
 ```{r}
-out1 <- filter_best(out, datsub$traitc[1], datsub$traitr[1])
-plot_best(out1, "mean", datsub[1,])
+ggplot_extreme(out, "signal", datsub[1,], condition = "sex + diet")
 ```
 
 ```{r}
-plot_best(out1, "signal", datsub[1,])
+ggplot_extreme(out, "mean", datsub[2,], condition = "sex + diet")
 ```
 
 ```{r}
-out2 <- filter_best(out, datsub$traitc[2], datsub$traitr[2])
-plot_best(out2, "mean", datsub[2,])
-```
-
-```{r}
-plot_best(out2, "signal", datsub[2,])
+ggplot_extreme(out, "signal", datsub[2,], condition = "sex + diet")
 ```
 
 
