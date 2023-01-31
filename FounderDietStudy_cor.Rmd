@@ -108,63 +108,11 @@ pvalc <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
 pvalc <- pvalc[upper.tri(pvalc)]
 ```
 
-```{r eval=FALSE}
-dat <- data.frame(cor_raw = corsraw[upper.tri(corsraw)],
-                  cor_adj = cors[upper.tri(cors)]) %>%
-  mutate(adjgrp = 1 + pmin(3, floor(cor_raw * 4)),
-         pvalr = -log10(pvalr),
-         pvalc = -log10(pvalc),
-         logpmax = pmin(5, pmax(pvalr, pvalc)),
-         logpmin = pmin(5, pmin(pvalr, pvalc)))
-```
-
 Each point is a pair of traits showing their raw and adjusted (signal only) correlations. Coloring is by the most significant `p_signal`
 for the two traits being correlated. This shows essentially no correlation between  until the raw are fairly large (>0.75). 
 
 Find large correlations for `raw` or `cor_adj` and relatively large `logpmax` for `p_signal`. Add these to plots of correlations (black circles) and use for pair
 plots below.
-
-```{r eval=FALSE}
-rr <- row(cors)[upper.tri(cors)][datsub$index]
-cc <- col(cors)[upper.tri(cors)][datsub$index]
-traits <- as.character(unique(out$trait))
-
-datsub <- dat %>%
-  mutate(index = row_number()) %>%
-  filter(cor_adj > 0.8 | cor_raw > 0.8,
-         logpmax > 2) %>%
-  filter(cor_adj - cor_raw == max(cor_adj - cor_raw) |
-         cor_adj - cor_raw == min(cor_adj - cor_raw))
-```
-
-```{r eval=FALSE}
-datsub <- datsub %>%
-  mutate(traitc = traits[cc],
-         traitr = traits[rr]) %>%
-  purrr::transpose() %>%
-  purrr::map(function(x) {
-    if(x$pvalc > x$pvalr) {
-      # switch row and columne
-      tmp <- x$traitc
-      x$traitc <- x$traitr
-      x$traitr <- tmp
-      tmp <- x$pvalc
-      x$pvalc <- x$pvalr 
-      x$pvalr <- tmp
-    }
-    x
-  }) %>%
-  purrr::transpose() %>%
-  lapply(unlist) %>%
-  as.data.frame() %>%
-  rename(pvalx = "pvalr",
-         pvaly = "pvalc",
-         traitx = "traitr",
-         traity = "traitc") %>%
-  select(traitx, traity, everything()) %>%
-  select(traitx, pvalx, traity, pvaly, cor_raw, cor_adj) %>%
-  mutate(across(is.numeric, signif, 3))
-```
 
 ```{r}
 plasmasum <- readRDS("traitsum.rds") %>%
@@ -190,56 +138,7 @@ ggplot(dat %>%
   geom_hex()
 ```
 
-```{r}
-ggplot(
-  dat %>%
-    rename(cor_raw = "cor1", cor_adj = "cor2") %>%
-    filter(cor_raw > .75, cor_adj > .75) %>%
-    mutate(logpmax = pmax(logpvalr, logpvalc)) %>%
-    arrange(logpmax)) +
-  aes(cor_raw, cor_adj, color = logpmax) +
-  geom_point() +
-  geom_smooth(col = "black") + 
-  scale_colour_gradientn(colours=rainbow(4))
-```
-
-
-```{r eval=FALSE}
-p <- ggplot(dat %>%
-  arrange(logpmax)) +
-  aes(cor_raw, cor_adj, color = logpmax) +
-  geom_point() +
-  geom_hline(yintercept = 0.5, col = "darkgray") +
-  geom_smooth(col = "black") + 
-  facet_wrap(~ adjgrp, scales = "free_x") +
-  scale_colour_gradientn(colours=rainbow(4))
-```
-
-```{r eval=FALSE}
-p +
-  geom_point(data = datsub, 
-    aes(x = cor_raw, y = cor_adj), 
-    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
-```
-
-Same plot but coloring by the least significant `p_signal` among a pair of traits.
-
-```{r eval=FALSE}
-p <- ggplot(dat %>% arrange(logpmin)) +
-  aes(cor_raw, cor_adj, color = logpmin) +
-  geom_point() +
-  geom_hline(yintercept = 0.5, col = "darkgray") +
-  geom_smooth(col = "black") + 
-  facet_wrap(~ adjgrp, scales = "free_x") +
-  scale_colour_gradientn(colours=rainbow(4))
-```
-
-```{r eval=FALSE}
-p +
-  geom_point(data = datsub, 
-    aes(x = cor_raw, y = cor_adj), 
-    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
-```
+# Extreme Comparisons Identified by Correlation and P-value
 
 ```{r}
 datsub <- cor_extreme(plasmasum, dat)
@@ -261,4 +160,52 @@ ggplot_extreme(out, "mean", datsub[2,], condition = "sex + diet")
 ggplot_extreme(out, "signal", datsub[2,], condition = "sex + diet")
 ```
 
+# Correlation Comparisons by P-value
+
+```{r}
+ggplot(
+  dat %>%
+    rename(cor_raw = "cor1", cor_adj = "cor2") %>%
+    filter(cor_raw > .75, cor_adj > .75) %>%
+    mutate(logpmax = pmax(logpvalr, logpvalc)) %>%
+    arrange(logpmax)) +
+  aes(cor_raw, cor_adj, color = logpmax) +
+  geom_point() +
+  geom_smooth(col = "black") + 
+  scale_colour_gradientn(colours=rainbow(4))
+```
+
+
+```{r}
+ggplot(
+  dat %>%
+    rename(cor_raw = "cor1", cor_adj = "cor2") %>%
+    mutate(logpmax = pmax(logpvalr, logpvalc)) %>%
+    arrange(logpmax)) +
+  aes(cor_raw, cor_adj, color = logpmax) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(data = datsub, 
+    aes(x = cor1, y = cor2), 
+    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
+```
+
+Same plot but coloring by the least significant `p_signal` among a pair of traits.
+
+```{r}
+ggplot(dat %>%
+    rename(cor_raw = "cor1", cor_adj = "cor2") %>%
+    mutate(logpmin = pmin(logpvalr, logpvalc)) %>%
+    arrange(logpmin)) +
+  aes(cor_raw, cor_adj, color = logpmin) +
+  geom_point() +
+  geom_hline(yintercept = 0.5, col = "darkgray") +
+  geom_smooth(col = "black") + 
+  scale_colour_gradientn(colours=rainbow(4)) +
+  geom_point(data = datsub, 
+    aes(x = cor1, y = cor2), 
+    shape = 21, fill = NA, size = 5, col = "black", stroke = 2)
+```
 
