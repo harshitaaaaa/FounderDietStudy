@@ -4,7 +4,7 @@ library(foundr)
 
 traits <- readRDS("traits.rds")
 traitsum <- readRDS("traitsum.rds")
-condition <- "sex_diet"
+condition <- "sex_condition"
 
 ################################################################
 

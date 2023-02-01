@@ -218,17 +218,12 @@ ggplot(pvals) +
 ### Compare raw and adjusted correlations
 
 ```{r}
-plasma <- readRDS("traits.rds") %>%
+plasmaData <- readRDS("traitData.rds") %>%
   filter(datatype == "plasma")
 ```
 
 ```{r}
-if(file.exists(filerds <- "plasmasignal.rds")) {
-  out <- readRDS(filerds)
-} else {
-  out <- partition(plasma)
-  saveRDS(out, filerds)
-}
+out <- readRDS("plasmaSignal.rds")
 ```
 
 ```{r}

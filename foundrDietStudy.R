@@ -10,7 +10,7 @@ foundrIntro <- function() {
         tags$li("liver: RNA-seq on liver"),
         tags$li("plasma: concentrations of circulating metabolites")),
       "Select one or more traits after deciding measurement set(s) and trait order. Traits window supports partial matching to find desired traits.",
-      "Facet plots by strain or sex_diet and subset strains if desired.",
+      "Facet plots by strain or sex_condition and subset strains if desired.",
       "Plots and data means (for selected traits) and data summaries (for whole measurement set) can be downloaded.",
       "See",
       shiny::a("Attie Lab Diabetes Database", href = "http://diabetes.wisc.edu/"),
@@ -28,21 +28,13 @@ foundrScatplot <- function(trait, traitdata, pair) {
         # Split trait pair by colon
         x <- stringr::str_split(x, " ON ")[[1]][2:1]
         # create out with columns for each trait pair
-        out <- tidyr::unite(traitdata, sex_diet, sex, diet)
-        # reorganize data
-        out <- 
-          dplyr::filter(
-            tidyr::pivot_wider(
-              dplyr::filter(
-                out,
-                trait %in% c(x[1],x[2])),
-              names_from = "trait", values_from = "value"),
-            # Make sure x and y columns have no missing data.
-            !(is.na(.data[[x[1]]]) | is.na(.data[[x[2]]])))
-        
+        out <- foundr::pivot_pair(
+          tidyr::unite(traitdata, sex_condition, sex, condition),
+          x)
+
         # create plot
         foundr::scatplot(out, x[1], x[2], shape_sex = FALSE) +
-          ggplot2::facet_grid(. ~ sex_diet)
+          ggplot2::facet_grid(. ~ sex_condition)
       })
   
   # Patch plots together by rows
@@ -55,7 +47,7 @@ foundrData <- function(datatraits, trait) {
     dplyr::mutate(
       datatraits,
       trait = abbreviate(trait, ceiling(60 / ltrait))),
-    sex_diet, sex, diet)
+    sex_condition, sex, condition)
 }
 
 foundrMean <- function(datatraits) {
@@ -64,9 +56,9 @@ foundrMean <- function(datatraits) {
       dplyr::mutate(
         dplyr::ungroup(
           dplyr::summarize(
-            dplyr::group_by(datatraits, strain, sex_diet, trait),
+            dplyr::group_by(datatraits, strain, sex_condition, trait),
             value = mean(value, na.rm = TRUE), .groups = "drop")),
         value = signif(value, 4)),
       names_from = "strain", values_from = "value"),
-    trait, sex_diet)
+    trait, sex_condition)
 }
