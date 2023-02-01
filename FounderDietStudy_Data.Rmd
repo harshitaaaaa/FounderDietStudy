@@ -50,7 +50,11 @@ if(file.exists(rdsfile <- "physioData.rds")) {
     rename(condition = "diet",
            animal = "number") %>%
     mutate(animal = as.character(animal)) %>%
-    select(strain, sex, animal, condition, trait, value)
+    select(strain, sex, animal, condition, trait, value) %>%
+    # Normal scores by trait
+    group_by(trait) %>%
+    mutate(value = foundr::nqrank(value)) %>%
+    ungroup()
   
   saveRDS(physioData, rdsfile)
 }
@@ -127,7 +131,11 @@ if(file.exists(rdsfile <- "plasmaData.rds")) {
       condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
     rename(trait = "compound",
            animal = "number") %>%
-    select(strain, sex, animal, condition, trait, value)
+    select(strain, sex, animal, condition, trait, value) %>%
+    # Normal scores by trait
+    group_by(trait) %>%
+    mutate(value = foundr::nqrank(value)) %>%
+    ungroup()
   
   saveRDS(plasmaData, rdsfile)
 }
@@ -270,7 +278,11 @@ if(file.exists(rdsfile <- "liverData.rds")) {
            condition = "diet",
            trait = "SYMBOL") %>%
     mutate(trait = paste(trait, ENTREZID, sep = "_")) %>%
-    select(strain, sex, animal, condition, trait, value) 
+    select(strain, sex, animal, condition, trait, value) %>%
+    # Normal scores by trait
+    group_by(trait) %>%
+    mutate(value = foundr::nqrank(value)) %>%
+    ungroup() 
 
   saveRDS(liverData, rdsfile)
 }
