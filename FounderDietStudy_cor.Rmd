@@ -33,31 +33,19 @@ library(foundr) # github/byandell/foundr
 # Compare raw and adjusted correlations
 
 ```{r}
-plasma <- readRDS("traits.rds") %>%
+plasmaData <- readRDS("traitData.rds") %>%
   filter(datatype == "plasma")
 ```
 
 ```{r}
-if(file.exists(filerds <- "plasmasignal.rds")) {
-  out <- readRDS(filerds)
-} else {
-  out <- partition(plasma)
-  saveRDS(out, filerds)
-}
+plasmaSignal <- readRDS("plasmaSignal.rds")
 ```
 
 ```{r}
-outw <- out %>%
-  select(-mean) %>%
-  pivot_wider(names_from = "trait", values_from = "signal")
-write.csv(outw, "plasmasignal.csv", row.names = FALSE)
-```
-
-```{r}
-outv <- 
+plasmaDataSignal <- 
   left_join(
-    plasma %>% select(-datatype),
-    out,
+    plasmaData %>% select(-datatype),
+    plasmaSignal,
     by = c("trait", "strain", "sex"))
 ```
 
@@ -65,7 +53,7 @@ outv <-
 corval <- 
   bind_rows(
     map(
-    split(outv, outv$trait),
+    split(plasmaDataSignal, plasmaDataSignal$trait),
     function(x) {
       terms <- c("signal","mean")
       as.data.frame(cor(x[,"value"], x[,terms], use = "pair"))
@@ -74,34 +62,34 @@ corval <-
 apply(corval[,-1], 2, summary)
 ```
 
-Pattern below makes sense because `mean` captures most of `value`, so their correlations range up toward 1. The `signal` has no clear pattern of correlation with `value`. However, `signal` is that part of the `value` consists of the terms `strain:diet` and `strain:diet:sex`, the important part of the signal.
+Pattern below makes sense because `mean` captures most of `value`, so their correlations range up toward 1. The `signal` has no clear pattern of correlation with `value`. However, `signal` is that part of the `value` consists of the terms `strain:condition` and `strain:condition:sex`, the important part of the signal.
 
 ```{r}
 GGally::ggpairs(corval[,-1])
 ```
 
 
-Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
-That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+Spearman rank correlation of residuals after removing `strain*sex` and `condition*sex` effects.
+That is, looking at correlation due to `strain*condition` and `strain*condition*sex` effects only.
 
 ```{r}
 if(file.exists(filerds <- "corsraw.rds")) {
   corsraw <- readRDS(filerds)
 } else {
-  corsraw <- abscorcalc(plasma)
+  corsraw <- abscorcalc(plasmaData)
   saveRDS(corsraw, filerds)  
 }
 if(file.exists(filerds <- "cors.rds")) {
   cors <- readRDS(filerds)
 } else {
-  cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
+  cors <- abscorcalc(plasmaSignal %>% select(-mean) %>% rename(value = "signal"))
   saveRDS(cors, filerds)  
 }
 ```
 
 ```{r eval=FALSE}
-traitsum <- readRDS("traitsum.rds")
-tmp <- (traitsum %>% filter(datatype == "plasma"))$p_signal
+traitPvalue <- readRDS("traitPvalue.rds")
+tmp <- (traitPvalue %>% filter(datatype == "plasma"))$p_signal
 pvalr <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
 pvalr <- pvalr[upper.tri(pvalr)]
 pvalc <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
@@ -115,12 +103,12 @@ Find large correlations for `raw` or `cor_adj` and relatively large `logpmax` fo
 plots below.
 
 ```{r}
-plasmasum <- readRDS("traitsum.rds") %>%
+plasmaPvalue <- readRDS("traitPvalue.rds") %>%
   filter(datatype == "plasma")
 ```
 
 ```{r}
-dat <- cor_compare(plasmasum, corsraw, cors)
+dat <- cor_compare(plasmaPvalue, corsraw, cors)
 ```
 
 ```{r}
@@ -141,23 +129,23 @@ ggplot(dat %>%
 # Extreme Comparisons Identified by Correlation and P-value
 
 ```{r}
-datsub <- cor_extreme(plasmasum, dat)
+datsub <- cor_extreme(plasmaPvalue, dat)
 ```
 
 ```{r}
-ggplot_extreme(out, "mean", datsub[1,], condition = "sex + diet")
+ggplot_extreme(plasmaSignal, "mean", datsub[1,], condition = "sex + condition")
 ```
 
 ```{r}
-ggplot_extreme(out, "signal", datsub[1,], condition = "sex + diet")
+ggplot_extreme(plasmaSignal, "signal", datsub[1,], condition = "sex + condition")
 ```
 
 ```{r}
-ggplot_extreme(out, "mean", datsub[2,], condition = "sex + diet")
+ggplot_extreme(plasmaSignal, "mean", datsub[2,], condition = "sex + condition")
 ```
 
 ```{r}
-ggplot_extreme(out, "signal", datsub[2,], condition = "sex + diet")
+ggplot_extreme(plasmaSignal, "signal", datsub[2,], condition = "sex + condition")
 ```
 
 # Correlation Comparisons by P-value

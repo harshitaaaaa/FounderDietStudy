@@ -31,21 +31,15 @@ library(foundr) # github/byandell/foundr
 ```
 
 ```{r}
-CCcolors <- c("#F0E442", "#555555", "#E69F00", "#0072B2",
-              "#56B4E9", "#009E73", "#D55E00", "#CC79A7")
-names(CCcolors) <- c("AJ", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB")
-```
-
-```{r}
 meas <- readRDS("traits.rds") %>%
   filter(datatype %in% params$dataset)
-measum <- readRDS("traitsum.rds") %>%
+traitPvalue <- readRDS("traitPvalue.rds") %>%
   filter(datatype %in% params$dataset) %>%
   arrange(p_sex_diet)
 ```
 
 ```{r}
-traits <- measum$trait[seq_len(as.integer(params$traits))]
+traits <- traitPvalue$trait[seq_len(as.integer(params$traits))]
 meas <- meas %>% 
   filter(trait %in% traits)
 ```
@@ -186,12 +180,12 @@ rr <- resid(fitred)
 ### p-value exploration
 
 ```{r}
-traitsum <- readRDS("traitsum.rds")
+traitPvalue <- readRDS("traitPvalue.rds")
 ```
 
 ```{r}
 logpval <- function(x) pmin(5, -log10(x))
-ggplot(traitsum %>% arrange(p_signal)) +
+ggplot(traitPvalue %>% arrange(p_signal)) +
   aes(logpval(p_diet), logpval(p_sex_diet), col = logpval(p_signal)) +
   geom_point(alpha = 0.75, shape = 21) +
   geom_smooth() +
@@ -200,7 +194,7 @@ ggplot(traitsum %>% arrange(p_signal)) +
 ```
 
 ```{r}
-pvals <- traitsum %>%
+pvals <- traitPvalue %>%
   select(-rawSD) %>%
   pivot_longer(-(datatype:trait), values_to = "pvalue", names_to = "term")
 ```
@@ -212,266 +206,6 @@ ggplot(pvals) +
   facet_grid(. ~ term)
 ```
 
-
-# Residual from Reduced fit for Dimension Reduction
-
-### Compare raw and adjusted correlations
-
-```{r}
-plasmaData <- readRDS("traitData.rds") %>%
-  filter(datatype == "plasma")
-```
-
-```{r}
-out <- readRDS("plasmaSignal.rds")
-```
-
-```{r}
-outv <- 
-  left_join(
-    plasma %>% select(-datatype),
-    out,
-    by = c("trait", "strain", "sex"))
-```
-
-```{r}
-corval <- 
-  bind_rows(
-    map(
-    split(outv, outv$trait),
-    function(x) {
-      terms <- c("signal","mean")
-      as.data.frame(cor(x[,"value"], x[,terms], use = "pair"))
-    }),
-    .id = "trait")
-apply(corval[,-1], 2, summary)
-```
-
-Pattern below makes sense because `mean` captures most of `value`, so their correlations range up toward 1. The `signal` has no clear pattern of correlation with `value`. However, `signal` is that part of the `value` consists of the terms `strain:diet` and `strain:diet:sex`, the important part of the signal.
-
-```{r}
-GGally::ggpairs(corval[,-1])
-```
-
-
-Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
-That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
-
-```{r}
-if(file.exists(filerds <- "corsraw.rds")) {
-  corsraw <- readRDS(filerds)
-} else {
-  corsraw <- abscorcalc(plasma)
-  saveRDS(corsraw, filerds)  
-}
-if(file.exists(filerds <- "cors.rds")) {
-  cors <- readRDS(filerds)
-} else {
-  cors <- abscorcalc(out %>% select(-mean) %>% rename(value = "signal"))
-  saveRDS(cors, filerds)  
-}
-```
-
-```{r}
-tmp <- (traitsum %>% filter(datatype == "plasma"))$p_signal
-xcol <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
-xcol <- xcol[upper.tri(xcol)]
-ycol <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
-ycol <- ycol[upper.tri(ycol)]
-```
-
-```{r}
-dat <- data.frame(raw = corsraw[upper.tri(corsraw)],
-                  adj = cors[upper.tri(cors)]) %>%
-  mutate(adjgrp = 1 + pmin(3, floor(raw * 4)),
-         xcol = xcol,
-         ycol = ycol,
-         logpval = pmin(5, -log10(pmin(xcol, ycol))),
-         logpmax = pmin(5, -log10(pmax(xcol, ycol))))
-```
-
-This shows essentially no correlation between raw and adjusted correlations until the raw are fairly large (>0.75). Also, 
-
-```{r}
-ggplot(dat %>%
-  arrange(logpval)) +
-  aes(raw, adj, color = logpval) +
-  geom_point() +
-  geom_hline(yintercept = 0.5, col = "darkgray") +
-  geom_smooth(col = "black") + 
-  facet_wrap(~ adjgrp, scales = "free_x") +
-  scale_colour_gradientn(colours=rainbow(4))
-```
-
-```{r}
-ggplot(dat %>% arrange(logpmax)) +
-  aes(raw, adj, color = logpmax) +
-  geom_point() +
-  geom_hline(yintercept = 0.5, col = "darkgray") +
-  geom_smooth(col = "black") + 
-  facet_wrap(~ adjgrp, scales = "free_x") +
-  scale_colour_gradientn(colours=rainbow(4))
-```
-
-Filter to large correlations for `raw` or `adj`. Note that if we insist that
-`logpval` is large, then both `raw` and `adj` correlations tend to be large.
-
-```{r}
-datsub <- dat %>%
-  mutate(index = row_number()) %>%
-  filter(adj > 0.8 | raw > 0.8,
-         logpval > 2) %>%
-  filter(adj - raw == max(adj - raw) |
-           adj - raw == min(adj - raw))
-```
-
-```{r}
-rr <- row(cors)[upper.tri(cors)][datsub$index]
-cc <- col(cors)[upper.tri(cors)][datsub$index]
-traits <- unique(out$trait)
-datsub$trait_adj <- traits[rr]
-datsub$trait_raw <- traits[cc]
-datsub <- datsub %>%
-  select(trait_raw, trait_adj, everything())
-```
-
-```{r}
-filter_best <- function(out, traitraw, traitadj) {
-  out %>%
-    filter(trait %in% c(datsub$trait_raw[1], datsub$trait_adj[1])) %>%
-    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
-    pivot_wider(names_from = "trait", values_from = "value") %>%
-    rename(x = datsub$trait_raw[1],
-           y = datsub$trait_adj[1])
-}
-```
-
-```{r}
-plot_best <- function(out1, summary_type, datsub) {
-  ggplot(out1 %>% filter(type == summary_type)) +
-    aes(x, y, fill = strain) +
-    geom_smooth(method = "lm", se = FALSE, fill = "white", col = "darkgray", formula = "y ~ x") +
-    geom_point(
-      ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
-    ggplot2::scale_shape_manual(values = c(23, 22)) +
-    ggplot2::scale_fill_manual(values = CCcolors) +
-    facet_wrap(~ sex + diet) +
-    xlab(datsub$trait_raw[1]) +
-    ylab(datsub$trait_adj[1]) +
-    ggtitle(paste(
-      summary_type, "for",
-      "raw cor", round(datsub$raw, 2),
-      ", adj cor", round(datsub$adj, 2),
-      ", logpval", round(datsub$logpval, 2))) +
-    theme(legend.position = "none")
-}
-```
-
-```{r}
-out1 <- filter_best(out, datsub$trait_raw[1], datsub$trait_adj[1])
-plot_best(out1, "mean", datsub[1,])
-```
-
-```{r}
-plot_best(out1, "signal", datsub[1,])
-```
-
-```{r}
-out2 <- filter_best(out, datsub$trait_raw[2], datsub$trait_adj[2])
-plot_best(out2, "mean", datsub[2,])
-```
-
-```{r}
-plot_best(out2, "signal", datsub[2,])
-```
-
-```{r}
-ggplot(
-  out %>%
-    filter(trait %in% c(datsub$trait_raw[2], datsub$trait_adj[2])) %>%
-    pivot_longer(signal:mean, names_to = "type", values_to = "value") %>%
-    pivot_wider(names_from = "trait", values_from = "value") %>%
-    rename(x = datsub$trait_raw[2],
-           y = datsub$trait_adj[2])) +
-  aes(x, y, fill = strain) +
-  geom_point(
-    ggplot2::aes(shape = sex), size = 3, color = "black", alpha = 0.65) +
-  ggplot2::scale_shape_manual(values = c(23, 22)) +
-  ggplot2::scale_fill_manual(values = CCcolors) +
-  facet_wrap(~ sex + diet) +
-  xlab(datsub$trait_raw[2]) +
-  ylab(datsub$trait_adj[2]) +
-  ggtitle(paste("raw cor", round(datsub$raw[2], 2),
-                ", adj cor", round(datsub$adj[2], 2),
-                ", logpval", round(datsub$logpval[2], 2))) +
-  theme(legend.position = "none")
-```
-
-```{r}
-tmp <- (traitsum %>% filter(datatype == "plasma"))$trait
-trait1 <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
-trait1 <- trait1[upper.tri(trait1)]
-trait2 <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
-trait2 <- trait2[upper.tri(trait2)]
-dat2 <- dat %>%
-  mutate(trait1 = paste0("plasma:", trait1),
-         trait2 = paste0("plasma:", trait2)) %>%
-  filter(logpmax > 3, adj > 0.5) %>%
-  select(trait1, trait2, everything()) %>%
-  rename(pval1 = "xcol", pval2 = "ycol")
-```
-
-### working app for pairs of traits
-
-Need to automate in various ways, such as datatype.
-Also think about same:same and same:other correlations across datatypes.
-
-```{r}
-plotly::ggplotly(
-  ggplot(dat2) +
-    aes(raw, adj, color = logpmax,
-        trait1 = trait1, trait2 = trait2, pval1 = pval1, pval2 = pval2) +
-    geom_abline(slope = 1, intercept = 0, col = "darkgray") +
-    geom_hline(yintercept = 0.5, col = "darkgray") +
-    geom_point(size = 2) +
-    geom_smooth() + 
-    scale_colour_gradientn(colours=rainbow(4)) +
-    ggtitle("plasma: adj cor > 0.5, -log p-value > 3"))
-```
-
-Traits that have strong `strain*diet` signal and are strongly correlated with at least one other strong trait.
-
-```{r}
-traits <- sort(unique(c(dat2$trait1, dat2$trait2)))
-```
-
-#### Correlation of raw and adjusted values
-
-```{r}
-rawadj <- out %>%
-  group_by(trait) %>%
-  summarize(rawadj = cor(value, signal, use = "pairwise.complete.obs"),
-            .groups = "drop") %>%
-  ungroup
-```
-
-```{r}
-summary(rawadj$rawadj)
-```
-
-```{r}
-rawadj <- left_join(
-  rawadj,
-  traitsum %>% filter(datatype == "plasma"),
-  by = "trait")
-```
-
-```{r}
-ggplot(rawadj) +
-  aes(-log10(p_signal), rawadj) +
-  geom_point(size = 3)
-```
-
 # Analysis over time
 
 ```{r}
@@ -481,7 +215,7 @@ gtt <- colnames(cors)[grep("GTT", colnames(cors))]
 ```
 
 ```{r}
-physiosum <- (traitsum %>% filter(datatype == "physio"))
+physiosum <- (traitPvalue %>% filter(datatype == "physio"))
 ```
 
 ## Body Weight (BW)
@@ -727,13 +461,13 @@ round(tmp$loadings[,1:3], 2)
 ## Clustering for plasma
 
 ```{r}
-plasmasum <- readRDS("traitsum.RDS") %>%
+plasmasum <- readRDS("traitPvalue.rds") %>%
   filter(datatype == "plasma",
          p_signal < 0.01) # restrict to traits with strong strain*diet signals
 ```
 
 ```{r}
-outma <- partition(readRDS("plasma.RDS")) %>%
+outma <- partition(readRDS("plasma.rds")) %>%
   select(names(out)) %>%
   filter(trait %in% plasmasum$trait)
 ```
@@ -790,22 +524,22 @@ patchwork::wrap_plots(p, nrow = length(p))
 ## Clustering for liver
 
 ```{r}
-liversum <- readRDS("traitsum.RDS") %>%
+liverPvalue <- readRDS("traitPvalue.rds") %>%
   filter(datatype == "liver",
          p_signal < 0.0001) # restrict to traits with strong strain*diet signals
 ```
 
 ```{r}
-outli <- partition(readRDS("liver.RDS")) %>%
+liverData <- partition(readRDS("liver.rds")) %>%
   select(names(out)) %>%
-  filter(trait %in% liversum$trait)
+  filter(trait %in% liverPvalue$trait)
 ```
 
 Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
 That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
 
 ```{r}
-corsli <- abscorcalc(outli %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
+corsli <- abscorcalc(liverData %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))
 ```
 
 ```{r}
@@ -819,7 +553,7 @@ groups <- cutree(fit, 4)
 ```
 
 ```{r}
-outlir <- outli %>% 
+liverDatar <- liverData %>% 
   select(-value, -ancillary, -noise) %>%
   rename(value = "signal")
 ```
@@ -827,7 +561,7 @@ outlir <- outli %>%
 ```{r}
 pcali <- list()
 for(i in 1:4) {
-  pcali[[i]] <- biplot_pca(biplot_data(outlir, names(groups[groups == i])))
+  pcali[[i]] <- biplot_pca(biplot_data(liverDatar, names(groups[groups == i])))
 }
 ```
 
