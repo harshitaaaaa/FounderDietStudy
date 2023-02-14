@@ -53,7 +53,7 @@ if(file.exists(rdsfile <- "physioData.rds")) {
     select(strain, sex, animal, condition, trait, value) %>%
     # Normal scores by trait
     group_by(trait) %>%
-    mutate(value = foundr::nqrank(value)) %>%
+    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
     ungroup()
   
   saveRDS(physioData, rdsfile)
@@ -98,15 +98,15 @@ if(file.exists(rdsfile <- "physioSignal.rds")) {
 rm(rdsfile)
 ```
 
-## Physiological P-value summaries
+## Physiological Stats Summaries
 
 ```{r}
-if(file.exists(rdsfile <- "physioPvalue.rds")) {
-  physioPvalue <- readRDS(rdsfile)
+if(file.exists(rdsfile <- "physioStats.rds")) {
+  physioStats <- readRDS(rdsfile)
 } else {
-  physioPvalue <- broomit(physioData)
+  physioStats <- strainstats(physioData)
   
-  saveRDS(physioPvalue, rdsfile)
+  saveRDS(physioStats, rdsfile)
 }
 rm(rdsfile)
 ```
@@ -134,7 +134,7 @@ if(file.exists(rdsfile <- "plasmaData.rds")) {
     select(strain, sex, animal, condition, trait, value) %>%
     # Normal scores by trait
     group_by(trait) %>%
-    mutate(value = foundr::nqrank(value)) %>%
+    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
     ungroup()
   
   saveRDS(plasmaData, rdsfile)
@@ -198,15 +198,15 @@ if(file.exists(rdsfile <- "plasmaSignal.rds")) {
 rm(rdsfile)
 ```
 
-## Plasma P-value Summaries
+## Plasma Stats Summaries
 
 ```{r}
-if(file.exists(rdsfile <- "plasmaPvalue.rds")) {
-  plasmaPvalue <- readRDS(rdsfile)
+if(file.exists(rdsfile <- "plasmaStats.rds")) {
+  plasmaStats <- readRDS(rdsfile)
 } else {
-  plasmaPvalue <- broomit(plasmaData)
+  plasmaStats <- strainstats(plasmaData)
 
-  saveRDS(plasmaPvalue, rdsfile)
+  saveRDS(plasmaStats, rdsfile)
 }
 rm(rdsfile)
 ```
@@ -281,7 +281,7 @@ if(file.exists(rdsfile <- "liverData.rds")) {
     select(strain, sex, animal, condition, trait, value) %>%
     # Normal scores by trait
     group_by(trait) %>%
-    mutate(value = foundr::nqrank(value)) %>%
+    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
     ungroup() 
 
   saveRDS(liverData, rdsfile)
@@ -313,15 +313,15 @@ if(file.exists(rdsfile <- "liverSignal.rds")) {
 rm(rdsfile)
 ```
 
-## Liver P-value Summaries
+## Liver Stats Summaries
 
 ```{r}
-if(file.exists(rdsfile <- "liverPvalue.rds")) {
-  liverPvalue <- readRDS(rdsfile)
+if(file.exists(rdsfile <- "liverStats.rds")) {
+  liverStats <- readRDS(rdsfile)
 } else {
-  liverPvalue <- broomit(liverData)
+  liverStats <- strainstats(liverData)
   
-  saveRDS(liverPvalue, rdsfile)
+  saveRDS(liverStats, rdsfile)
 }
 rm(rdsfile)
 ```
@@ -329,43 +329,49 @@ rm(rdsfile)
 # Trait Compilations
 
 Combine all data together into unified objects.
+Drop traits that have missing p-value (due to imbalance of some pathological form).
 
 ```{r}
-traitPvalue <- dplyr::bind_rows(
-  physio = readRDS("physioPvalue.rds"),
-  plasma = readRDS("plasmaPvalue.rds"),
-  liver = readRDS("liverPvalue.rds"),
+traitStats <- dplyr::bind_rows(
+  physio = readRDS("physioStats.rds"),
+  plasma = readRDS("plasmaStats.rds"),
+  liver = readRDS("liverStats.rds"),
   .id = "datatype")
 
-saveRDS(traitPvalue, "traitPvalue.rds")
-```
+dropTraits <- unique(filter(traitStats, is.na(p.value)))$trait
 
-```{r}
-readr::write_csv(traitPvalue, "traitPvalue.csv")
-```
+traitStats <- dplyr::filter(traitStats, !(trait %in% dropTraits))
 
-```{r}
+saveRDS(traitStats, "traitStats.rds")
+readr::write_csv(traitStats, "traitStats.csv")
+
+rm(traitStats)
+
 traitData <- dplyr::bind_rows(
   physio = readRDS("physioData.rds"),
   plasma = readRDS("plasmaData.rds"),
   liver = readRDS("liverData.rds"),
   .id = "datatype")
 
-saveRDS(traitData, "traitData.rds")
-```
+traitData <- dplyr::filter(traitData, !(trait %in% dropTraits))
 
-```{r}
+saveRDS(traitData, "traitData.rds")
+readr::write_csv(traitData, "traitData.csv")
+
+rm(traitData)
+
 traitSignal <- dplyr::bind_rows(
   physio = readRDS("physioSignal.rds"),
   plasma = readRDS("plasmaSignal.rds"),
   liver = readRDS("liverSignal.rds"),
   .id = "datatype")
 
-saveRDS(traitSignal, "traitSignal.rds")
-```
+traitSignal <- dplyr::filter(traitSignal, !(trait %in% dropTraits))
 
-```{r}
+saveRDS(traitSignal, "traitSignal.rds")
 readr::write_csv(traitSignal, "traitSignal.csv")
+
+rm(traitSignal)
 ```
 
 

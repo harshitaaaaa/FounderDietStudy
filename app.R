@@ -1,21 +1,23 @@
 library(shiny)
+devtools::install_cran("plotly") # plotly not yet on UW dataviz
+devtools::install_cran("markdown") # markdown not yet on UW dataviz
+devtools::install_cran("patchwork") # patchwork not yet on UW dataviz
 devtools::install_github("byandell/foundr")
 library(foundr)
 
-traits <- readRDS("traits.rds")
-traitsum <- readRDS("traitsum.rds")
-condition <- "sex_condition"
+traitData <- readRDS("traitData.rds")
+traitStats <- readRDS("traitStats.rds")
+traitSignal <- readRDS("traitSignal.rds")
+helppath <- "help.md"
 
 ################################################################
-
-source("foundrDietStudy.R")
 
 ui <- foundr::foundrUI("Founder Diet Study")
 
 server <- function(input, output, session) {
     
   foundr::foundrServer(input, output, session,
-                       traits, traitsum, condition)
+                       traitData, traitStats, traitSignal, helppath)
   
   # Allow reconnect with Shiny Server.
   session$allowReconnect(TRUE)

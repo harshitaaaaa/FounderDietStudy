@@ -31,6 +31,34 @@ library(foundr) # github/byandell/foundr
 ```
 
 ```{r}
+traitData <- readRDS("plasmaData.rds")
+```
+
+# Volcano Plot Ideas
+
+```{r}
+dat <- traitData %>% filter(trait == trait[1])
+datb <- broomit(dat)
+```
+
+```{r}
+signal <- "strain * sex * condition"
+form <- stats::formula(paste("value", "~", signal))
+fit <- stats::lm(form, dat)
+drops <- broom::tidy(drop1(fit,fit, test = "F"))
+sdcomp <- drops$sumsq[-1] / drops$df[-1]
+names(sdcomp) <- drops$term[-1]
+sqrt(sdcomp)
+```
+Signed coefficients. All others involve multiple strains.
+
+```{r}
+coef(fit)[c("sexM", "conditionHF_LC", "sexM:conditionHF_LC")]
+```
+
+# Plotly of traits
+
+```{r}
 meas <- readRDS("traits.rds") %>%
   filter(datatype %in% params$dataset)
 traitPvalue <- readRDS("traitPvalue.rds") %>%
