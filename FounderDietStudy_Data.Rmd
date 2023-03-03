@@ -300,8 +300,6 @@ liverData %>%
   pivot_wider(names_from = "sex_condition", values_from = "n")
 ```
 
-## Liver Signals
-
 ```{r}
 if(file.exists(rdsfile <- "liverSignal.rds")) {
   liverSignal <- readRDS(rdsfile)
@@ -312,8 +310,6 @@ if(file.exists(rdsfile <- "liverSignal.rds")) {
 }
 rm(rdsfile)
 ```
-
-## Liver Stats Summaries
 
 ```{r}
 if(file.exists(rdsfile <- "liverStats.rds")) {
@@ -326,6 +322,49 @@ if(file.exists(rdsfile <- "liverStats.rds")) {
 rm(rdsfile)
 ```
 
+# Liver metabolites
+
+```{r}
+livermetabfile <- linkpath("liver_metab", links)
+```
+
+```{r}
+if(file.exists(rdsfile <- "livermetabData.rds")) {
+  liverData <- readRDS(rdsfile)
+} else {
+  livermetabData <- read_excel(livermetabfile, skip = 3)
+  liverData <- 
+    left_join(
+      left_join(
+        read_csv(liverfile) %>%
+          rename(ENTREZID = "...1") %>%
+          mutate(ENTREZID = as.character(ENTREZID)) %>%
+          pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
+          separate(strain_number, sep = "_", into = c("strain","number")) %>%
+          mutate(strain = ifelse(strain == "A129", "129", strain)),
+        annot %>%
+          mutate(number = as.character(number)),
+        by = c("strain", "number")),
+      liverAnnot[,-1] %>%
+        mutate(ENTREZID = as.character(ENTREZID)),
+      by = "ENTREZID") %>%
+    filter(value > min(value)) %>% # Minimum is stand-in for missing value.
+    rename(animal = "number",
+           condition = "diet",
+           trait = "SYMBOL") %>%
+    mutate(trait = paste(trait, ENTREZID, sep = "_")) %>%
+    select(strain, sex, animal, condition, trait, value) %>%
+    # Normal scores by trait
+    group_by(trait) %>%
+    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
+    ungroup() 
+
+  saveRDS(liverData, rdsfile)
+}
+rm(rdsfile)
+
+```
+
 # Trait Compilations
 
 Combine all data together into unified objects.
@@ -333,12 +372,16 @@ Drop traits that have missing p-value (due to imbalance of some pathological for
 
 ```{r}
 traitStats <- dplyr::bind_rows(
-  physio = readRDS("physioStats.rds"),
-  plasma = readRDS("plasmaStats.rds"),
-  liver = readRDS("liverStats.rds"),
-  .id = "datatype")
+  Physio = readRDS("physioStats.rds"),
+  PlaMet = readRDS("plasmaStats.rds"),
+  LivRna = readRDS("liverStats.rds"),
+  .id = "dataset")
 
-dropTraits <- unique(filter(traitStats, is.na(p.value)))$trait
+dropTraits <- unique(filter(
+  filter(
+    traitStats,
+    term != "noise"),
+  is.na(p.value)))$trait
 
 traitStats <- dplyr::filter(traitStats, !(trait %in% dropTraits))
 
@@ -348,10 +391,10 @@ readr::write_csv(traitStats, "traitStats.csv")
 rm(traitStats)
 
 traitData <- dplyr::bind_rows(
-  physio = readRDS("physioData.rds"),
-  plasma = readRDS("plasmaData.rds"),
-  liver = readRDS("liverData.rds"),
-  .id = "datatype")
+  Physio = readRDS("physioData.rds"),
+  PlaMet = readRDS("plasmaData.rds"),
+  LivRna = readRDS("liverData.rds"),
+  .id = "dataset")
 
 traitData <- dplyr::filter(traitData, !(trait %in% dropTraits))
 
@@ -361,10 +404,10 @@ readr::write_csv(traitData, "traitData.csv")
 rm(traitData)
 
 traitSignal <- dplyr::bind_rows(
-  physio = readRDS("physioSignal.rds"),
-  plasma = readRDS("plasmaSignal.rds"),
-  liver = readRDS("liverSignal.rds"),
-  .id = "datatype")
+  Physio = readRDS("physioSignal.rds"),
+  PlaMet = readRDS("plasmaSignal.rds"),
+  LivRna = readRDS("liverSignal.rds"),
+  .id = "dataset")
 
 traitSignal <- dplyr::filter(traitSignal, !(trait %in% dropTraits))
 

@@ -34,17 +34,19 @@ library(foundr) # github/byandell/foundr
 
 ```{r}
 plasmaData <- readRDS("traitData.rds") %>%
-  filter(datatype == "plasma")
+  filter(datatype == "plasma") %>%
+  rename(dataset = "datatype")
 ```
 
 ```{r}
-plasmaSignal <- readRDS("plasmaSignal.rds")
+plasmaSignal <- readRDS("plasmaSignal.rds") %>%
+  mutate(dataset = "plasma")
 ```
 
 ```{r}
 plasmaDataSignal <- 
   left_join(
-    plasmaData %>% select(-datatype),
+    plasmaData %>% select(-dataset),
     plasmaSignal,
     by = c("trait", "strain", "sex"))
 ```
@@ -88,8 +90,10 @@ if(file.exists(filerds <- "cors.rds")) {
 ```
 
 ```{r eval=FALSE}
-traitPvalue <- readRDS("traitPvalue.rds")
-tmp <- (traitPvalue %>% filter(datatype == "plasma"))$p_signal
+traitStats <- readRDS("traitStats.rds")
+tmp <- (traitStats %>%
+          filter(datatype == "plasma",
+                 term == "signal"))$p.value
 pvalr <- matrix(tmp, byrow = TRUE, nrow = length(tmp), ncol = length(tmp))
 pvalr <- pvalr[upper.tri(pvalr)]
 pvalc <- matrix(tmp, byrow = FALSE, nrow = length(tmp), ncol = length(tmp))
@@ -103,12 +107,13 @@ Find large correlations for `raw` or `cor_adj` and relatively large `logpmax` fo
 plots below.
 
 ```{r}
-plasmaPvalue <- readRDS("traitPvalue.rds") %>%
-  filter(datatype == "plasma")
+plasmaStats <- readRDS("traitStats.rds") %>%
+  filter(datatype == "plasma") %>%
+  rename(dataset = "datatype")
 ```
 
 ```{r}
-dat <- cor_compare(plasmaPvalue, corsraw, cors)
+dat <- cor_compare(plasmaStats, corsraw, cors)
 ```
 
 ```{r}
@@ -129,23 +134,78 @@ ggplot(dat %>%
 # Extreme Comparisons Identified by Correlation and P-value
 
 ```{r}
-datsub <- cor_extreme(plasmaPvalue, dat)
+(datsub <- cor_extreme(plasmaStats, dat))
 ```
 
 ```{r}
-ggplot_extreme(plasmaSignal, "mean", datsub[1,], condition = "sex + condition")
+traits <- c(datsub$traitx, datsub$traity) 
+sampleData <- plasmaData %>% filter(trait %in% traits)
+for(i in seq_along(traits)) {
+  sampleData <- mutate(sampleData, trait = ifelse(trait == traits[i], LETTERS[i], trait))
+}
+sampleData <- sampleData %>% mutate(condition = ifelse(condition == "HC_LF", "X", "Y"))
+sampleData$dataset <- "sample"
+anim <- sort(unique(sampleData$animal))
+shuf <- sample(anim, length(anim))
+names(shuf) <- anim
+sampleData$animal <- shuf[sampleData$animal]
+sampleData <- sampleData %>%
+  group_by(trait) %>%
+  mutate(value = (value - mean(value, na.rm = TRUE)) / sd(value, na.rm = TRUE)) %>%
+  ungroup()
+write_csv(sampleData, "sampleData.csv")
+save(sampleData, file = "sampleData.RData")
+
+ggplot(sampleData) + aes(strain, value) + geom_point() + facet_grid(sex+condition ~ trait)
 ```
 
 ```{r}
-ggplot_extreme(plasmaSignal, "signal", datsub[1,], condition = "sex + condition")
+sampleSignal <- partition(sampleData)
+```
+
+## Scatterplots
+
+- C on A: mostly signal
+  + mean cor = 0.0107; signal cor = 0.90
+  + -10*log(p.value) = 1.97, 2.81
+- D on B: negligible signal
+  + mean cor = 0.8110; signal cor = 0.28
+  + -10*log(p.value) = 0.32, 2.73
+
+#### Plots of Means
+
+```{r}
+out <- traitSolos(sampleData, sampleSignal,
+                  response = "mean")
+plot(out)
+#ggplot_extreme(plasmaSignal, "mean", datsub[1,], condition = "sex + condition")
 ```
 
 ```{r}
-ggplot_extreme(plasmaSignal, "mean", datsub[2,], condition = "sex + condition")
+out2 <- traitPairs(
+  out,
+  traitnames = attr(out, "traitnames"),
+  pair = c(
+    paste(attr(out, "traitnames")[1:2], collapse = " ON "),
+    paste(attr(out, "traitnames")[3:4], collapse = " ON ")))
+plot(out2)
 ```
 
 ```{r}
-ggplot_extreme(plasmaSignal, "signal", datsub[2,], condition = "sex + condition")
+out <- traitSolos(sampleData, sampleSignal,
+                  response = "signal")
+plot(out)
+#ggplot_extreme(plasmaSignal, "mean", datsub[1,], condition = "sex + condition")
+```
+
+```{r}
+out2 <- traitPairs(
+  out,
+  traitnames = attr(out, "traitnames"),
+  pair = c(
+    paste(attr(out, "traitnames")[1:2], collapse = " ON "),
+    paste(attr(out, "traitnames")[3:4], collapse = " ON ")))
+plot(out2)
 ```
 
 # Correlation Comparisons by P-value
