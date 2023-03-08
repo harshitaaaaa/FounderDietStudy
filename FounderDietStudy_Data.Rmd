@@ -325,44 +325,52 @@ rm(rdsfile)
 # Liver metabolites
 
 ```{r}
-livermetabfile <- linkpath("liver_metab", links)
+LivMetfile <- linkpath("liver_metab", links)
 ```
 
 ```{r}
-if(file.exists(rdsfile <- "livermetabData.rds")) {
-  liverData <- readRDS(rdsfile)
+if(file.exists(rdsfile <- "LivMetData.rds")) {
+  LivMetData <- readRDS(rdsfile)
 } else {
-  livermetabData <- read_excel(livermetabfile, skip = 3)
-  liverData <- 
-    left_join(
-      left_join(
-        read_csv(liverfile) %>%
-          rename(ENTREZID = "...1") %>%
-          mutate(ENTREZID = as.character(ENTREZID)) %>%
-          pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
-          separate(strain_number, sep = "_", into = c("strain","number")) %>%
-          mutate(strain = ifelse(strain == "A129", "129", strain)),
-        annot %>%
-          mutate(number = as.character(number)),
-        by = c("strain", "number")),
-      liverAnnot[,-1] %>%
-        mutate(ENTREZID = as.character(ENTREZID)),
-      by = "ENTREZID") %>%
-    filter(value > min(value)) %>% # Minimum is stand-in for missing value.
-    rename(animal = "number",
-           condition = "diet",
-           trait = "SYMBOL") %>%
-    mutate(trait = paste(trait, ENTREZID, sep = "_")) %>%
+  LivMetData <- read_excel(LivMetfile, skip = 3) %>%
+    pivot_longer(-(1:5), names_to = "mousecode", values_to = "value") %>%
+    mutate(
+      strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
+      animal = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
+      sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
+      condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
+    rename(trait = "compound") %>%
     select(strain, sex, animal, condition, trait, value) %>%
     # Normal scores by trait
     group_by(trait) %>%
     mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup() 
+    ungroup()
 
-  saveRDS(liverData, rdsfile)
+  saveRDS(LivMetData, rdsfile)
 }
 rm(rdsfile)
+```
 
+```{r}
+if(file.exists(rdsfile <- "LivMetSignal.rds")) {
+  LivMetSignal <- readRDS(rdsfile)
+} else {
+  LivMetSignal <- partition(LivMetData)
+  
+  saveRDS(LivMetSignal, rdsfile)
+}
+rm(rdsfile)
+```
+
+```{r}
+if(file.exists(rdsfile <- "LivMetStats.rds")) {
+  LivMetStats <- readRDS(rdsfile)
+} else {
+  LivMetStats <- strainstats(LivMetData)
+
+  saveRDS(LivMetStats, rdsfile)
+}
+rm(rdsfile)
 ```
 
 # Trait Compilations
@@ -374,6 +382,7 @@ Drop traits that have missing p-value (due to imbalance of some pathological for
 traitStats <- dplyr::bind_rows(
   Physio = readRDS("physioStats.rds"),
   PlaMet = readRDS("plasmaStats.rds"),
+  LivMet = readRDS("LivMetStats.rds"),
   LivRna = readRDS("liverStats.rds"),
   .id = "dataset")
 
@@ -393,6 +402,7 @@ rm(traitStats)
 traitData <- dplyr::bind_rows(
   Physio = readRDS("physioData.rds"),
   PlaMet = readRDS("plasmaData.rds"),
+  LivMet = readRDS("LivMetData.rds"),
   LivRna = readRDS("liverData.rds"),
   .id = "dataset")
 
@@ -406,6 +416,7 @@ rm(traitData)
 traitSignal <- dplyr::bind_rows(
   Physio = readRDS("physioSignal.rds"),
   PlaMet = readRDS("plasmaSignal.rds"),
+  LivMet = readRDS("LivMetSignal.rds"),
   LivRna = readRDS("liverSignal.rds"),
   .id = "dataset")
 
