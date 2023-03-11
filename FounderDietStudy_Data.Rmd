@@ -29,7 +29,7 @@ See the QC Analysis Report on liver RNAseq data (in zip file under folder `Liver
 # Physiological trait counts by strain, sex, diet
 
 ```{r}
-physiofile <- linkpath("physio", links)
+physiofile <- linkpath("Physio", links)
 excel_sheets(physiofile)
 ```
 
@@ -114,7 +114,7 @@ rm(rdsfile)
 # Plasma metabolite abundance data
 
 ```{r}
-plasmafile <- linkpath("plasma", links)
+plasmafile <- linkpath("PlaMet", links)
 excel_sheets(plasmafile)
 ```
 
@@ -251,7 +251,7 @@ Note also that the liver data refers to strain `129` as `A129` to not begin with
 this has to be corrected.
 
 ```{r}
-liverfile <- linkpath("liver", links)
+liverfile <- linkpath("LivRna", links)
 ```
 
 ```{r}
@@ -282,8 +282,8 @@ if(file.exists(rdsfile <- "liverData.rds")) {
     # Normal scores by trait
     group_by(trait) %>%
     mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup() 
-
+    ungroup()
+  
   saveRDS(liverData, rdsfile)
 }
 rm(rdsfile)
@@ -325,7 +325,7 @@ rm(rdsfile)
 # Liver metabolites
 
 ```{r}
-LivMetfile <- linkpath("liver_metab", links)
+LivMetfile <- linkpath("LivMet", links)
 ```
 
 ```{r}

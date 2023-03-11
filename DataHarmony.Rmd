@@ -1,0 +1,72 @@
+---
+title: "Data Harmony"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(readr)
+library(foundr) # github/byandell/foundr
+```
+
+```{r}
+for(filename in list.files("R", full.names = TRUE)) {
+  source(filename)
+}
+```
+
+
+# Harmonize Data
+
+```{r}
+links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
+```
+
+```{r}
+harmonize("Physio", links, PhysioHarmony)
+```
+
+```{r}
+harmonize("PlaMet", links, MetHarmony, skiprows = 4, skipcols = 4)
+```
+
+```{r}
+harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
+```
+
+```{r}
+harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
+```
+
+
+The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`. Needed for `LivRna`.
+
+```{r}
+annotfile <- linkpath("annot", links)
+excel_sheets(annotfile)
+annot <- read_excel(annotfile) %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+```
+
+There is a separate liver annotation file, which relates `ENTREZID` to `SYMBOL`.
+
+```{r}
+liverAnnot <- linkpath("liver_annot", links)
+liverAnnot <- read_csv(liverAnnot)
+```
+
+```{r}
+harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot)
+```
+
+```{r}
+bind_traits(c("Physio","PlaMet","LivMet","LivRna"))
+```
+
