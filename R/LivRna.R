@@ -43,12 +43,7 @@ LivRnaHarmony <- function(dataset, links, annot, liverAnnot, ...) {
     mutate(trait = paste(trait, ENTREZID, sep = "_")) %>%
     
     # These are harmonized columns and their names.
-    select(strain, sex, animal, condition, trait, value) %>%
-    
-    # Normal scores by trait
-    group_by(trait) %>%
-    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup() 
+    select(strain, sex, animal, condition, trait, value)
   
   # Find genes with duplicated symbols.
   dupGenes <-

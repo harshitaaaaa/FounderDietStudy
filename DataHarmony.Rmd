@@ -41,11 +41,6 @@ harmonize("PlaMet", links, MetHarmony, skiprows = 4, skipcols = 4)
 harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
 ```
 
-```{r}
-harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
-```
-
-
 The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`. Needed for `LivRna`.
 
 ```{r}
