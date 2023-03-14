@@ -1,0 +1,195 @@
+---
+title: "Metabolites"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(foundr)
+```
+```{r}
+traitSignal <- readRDS("traitSignal.rds") %>%
+  filter(dataset %in% c("LivMet", "PlaMet"))
+```
+
+
+```{r}
+traits <- (traitSignal %>%
+  count(dataset, trait) %>%
+  pivot_wider(names_from = "dataset", values_from = "n", values_fill = 0) %>%
+  filter(LivMet > 0, PlaMet > 0))$trait
+```
+
+```{r}
+traitData <- readRDS("traitData.rds") %>%
+  filter(dataset %in% c("LivMet", "PlaMet"),
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+traitSignal <- readRDS("traitSignal.rds") %>%
+  filter(dataset %in% c("LivMet", "PlaMet"),
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+traitStats <- readRDS("traitStats.rds") %>%
+  filter(dataset %in% c("LivMet", "PlaMet"),
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+```
+
+# Correlation of values
+
+```{r}
+cors <- bind_cols(
+  # Correlation of individual
+  traitData %>%
+    pivot_wider(names_from = "dataset", values_from = "value") %>%
+    group_by(trait) %>%
+    summarize(
+      individual = cor(PlaMet, LivMet, use = "pair"),
+      .groups = "drop") %>%
+    ungroup(),
+  # Correlation of cellmean
+  traitSignal %>%
+    select(-signal) %>%
+    pivot_wider(names_from = "dataset", values_from = "cellmean") %>%
+    group_by(trait) %>%
+    summarize(
+      cellmean = cor(PlaMet, LivMet, use = "pair"),
+      .groups = "drop") %>%
+    ungroup() %>%
+    select(-trait),
+  # Correlation of signal
+  traitSignal %>%
+    select(-cellmean) %>%
+    pivot_wider(names_from = "dataset", values_from = "signal") %>%
+    group_by(trait) %>%
+    summarize(
+      signal = cor(PlaMet, LivMet, use = "pair"),
+      .groups = "drop") %>%
+    ungroup() %>%
+    select(-trait),
+  # Correlation of individual signal
+  left_join(
+    traitData,
+    traitSignal,
+    by = c("dataset", "strain", "sex", "condition", "trait")) %>%
+    mutate(value = value + signal - cellmean) %>%
+    select(-signal, -cellmean) %>%
+    pivot_wider(names_from = "dataset", values_from = "value") %>%
+    group_by(trait) %>%
+    summarize(
+      ind_signal = cor(PlaMet, LivMet, use = "pair"),
+      .groups = "drop") %>%
+    ungroup() %>%
+    select(-trait),
+  # Correlation of individual
+  left_join(
+    traitData,
+    traitSignal,
+    by = c("dataset", "strain", "sex", "condition", "trait")) %>%
+    mutate(value = value - cellmean) %>%
+    select(-signal, -cellmean) %>%
+    pivot_wider(names_from = "dataset", values_from = "value") %>%
+    group_by(trait) %>%
+    summarize(
+      noise = cor(PlaMet, LivMet, use = "pair"),
+      .groups = "drop") %>%
+    ungroup() %>%
+    select(-trait))
+```
+
+```{r}
+ggplot(
+  cors %>%
+    pivot_longer(cellmean:noise,
+                 names_to = "response", values_to = "cors") %>%
+    mutate(response = factor(response, c("cellmean","signal","ind_signal","noise")))) +
+  aes(individual, cors) +
+  facet_wrap(~ response) +
+  geom_point(shape = 1) +
+  geom_smooth(method = "lm", se = FALSE, formula = "y~x", col = "red") +
+  geom_abline(slope = 1, intercept = 0, col = "blue") +
+  ylab("extracted correlation") +
+  xlab("raw correlation")
+```
+
+
+```{r}
+ggplot(cors) +
+  aes(ind_signal, signal) +
+  geom_point(shape = 1) +
+  geom_smooth(method = "lm", se = FALSE, formula = "y~x", col = "red") +
+  geom_abline(slope = 1, intercept = 0, col = "blue")
+```
+
+
+```{r}
+ggplot(cors) +
+  aes(ind_signal, noise) +
+  geom_point(shape = 1) +
+  geom_smooth(method = "lm", se = FALSE, formula = "y~x", col = "red") +
+  geom_abline(slope = 1, intercept = 0, col = "blue")
+```
+
+# Correlation of Stats
+
+```{r}
+(stats <- traitStats %>%
+   mutate(p.value = -log10(p.value)) %>%
+   pivot_longer(SD:p.value, names_to = "stats", values_to = "value") %>%
+   pivot_wider(names_from = "dataset", values_from = "value"))
+```
+
+```{r}
+CB_colors <- RColorBrewer::brewer.pal(n = 3, name = "Dark2")
+c("#1B9E77", "#D95F02", "#7570B3")
+```
+
+```{r}
+plot_stats <- function(stats, terms = unique(stats$term)) {
+  p1 <- ggplot(
+    stats %>%
+      filter(stats == "p.value",
+             term %in% terms) %>%
+      mutate(term = factor(term, terms))) +
+    aes(PlaMet, LivMet) +
+    facet_grid(stats ~ term, scale = "free") +
+    geom_point(shape = 1, col = CB_colors[3]) +
+    geom_smooth(method = "lm", se = FALSE, formula = "y~x", col = CB_colors[2]) +
+    geom_abline(slope = 1, intercept = 0, col = CB_colors[1]) +
+    xlab("")
+  p2 <- ggplot(
+    stats %>%
+      filter(stats == "SD",
+             term %in% terms) %>%
+      mutate(term = factor(term, terms))) +
+    aes(PlaMet, LivMet) +
+    facet_grid(stats ~ term, scale = "free") +
+    geom_point(shape = 1, col = CB_colors[3]) +
+    geom_smooth(method = "lm", se = FALSE, formula = "y~x", col = CB_colors[2]) +
+    geom_abline(slope = 1, intercept = 0, col = CB_colors[1])
+cowplot::plot_grid(p1, p2, nrow = 2)
+}
+```
+
+
+```{r}
+plot_stats(stats, c("cellmean", "signal", "rest"))
+```
+
+```{r}
+plot_stats(stats, c("signal", "strain_condition", "strain_sex_condition"))
+```
+
+```{r}
+plot_stats(stats, c("strain", "sex", "strain_sex"))
+```
+
+```{r}
+plot_stats(stats, c("condition", "sex_condition"))
+```
