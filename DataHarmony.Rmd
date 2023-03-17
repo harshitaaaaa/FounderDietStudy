@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 ```{r}
@@ -33,11 +33,11 @@ links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
 harmonize("Physio", links, PhysioHarmony)
 ```
 
-```{r}
+```{r warning = FALSE}
 harmonize("PlaMet", links, MetHarmony, skiprows = 4, skipcols = 4)
 ```
 
-```{r}
+```{r warning = FALSE}
 harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
 ```
 
@@ -57,7 +57,7 @@ liverAnnot <- linkpath("liver_annot", links)
 liverAnnot <- read_csv(liverAnnot)
 ```
 
-```{r}
+```{r warning = FALSE}
 harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot)
 ```
 
