@@ -14,3 +14,4 @@ rsconnect/
 *.pptx
 RawData/
 inst/
+*.pdf

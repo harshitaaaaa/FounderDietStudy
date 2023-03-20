@@ -1,5 +1,5 @@
 ---
-title: "WGCNA Visualization"
+title: "Module Visualization"
 author: "Brian Yandell"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
@@ -16,19 +16,19 @@ knitr::opts_chunk$set(echo = params$echo, warning = FALSE, message = FALSE)
 ```
 
 ```{r}
-devtools::install_cran("plotly") # plotly not yet on UW dataviz
-devtools::install_cran("markdown") # markdown not yet on UW dataviz
-devtools::install_cran("cowplot") # patchwork not yet on UW dataviz
-devtools::install_cran("patchwork") # patchwork not yet on UW dataviz
-#devtools::install_github("byandell/foundr")
+devtools::install_cran("plotly") #  not yet on UW dataviz
+devtools::install_cran("markdown") #  not yet on UW dataviz
+devtools::install_cran("cowplot") #  not yet on UW dataviz
+devtools::install_cran("patchwork") #  not yet on UW dataviz
+devtools::install_cran("ggdendro") # not yet in UW dataviz
+devtools::install_github("byandell/foundr")
 ```
 
 ```{r}
 options(stringsAsFactors = FALSE)
 ```
 
-This document selects a `dataset` and creates WGCNA modules. Selecting a `response` (among `individual`, `cellmean`, `signal`, `ind_signal`) enables visualization of stats for the modules as well as the WGCNA dendogram and color panel. Selects a response to `compare` enables comparison of two types of WGCNA modules. The first figure plots kMEs by `response` and `compare` across their modules (which can be subsetted).
-The second one shows correlation of eigentraits across `response` and `compare` choices. Data can be downloaded by clicking the button.
+This document selects a `dataset` and creates WGCNA modules. Selecting a `response` enables visualization of stats for the modules as well as the WGCNA dendogram and color panel. Selects a `facet response` and `color response` compares two types of WGCNA modules. The first figure plots kMEs while the second one shows correlation of eigentraits across those responses. Data can be downloaded by clicking the button.
 
 ### Explanation of Responses
 
@@ -42,13 +42,16 @@ cellmean = signal + rest
 signal = strain:condition + strain:sex:condition
 ```
 
-The `cellmean` and `noise` are uncorrelated, as are the `signal` and `rest` which add up to the `cellmean`. When we might see some patterns when comparing these components across traits within WGCNA modules. That is, a module identified with the `indivdual` response (the default approach) may represent primarily `signal`, which would be useful. However, if a module is primarily associated with `rest` or `noise`, it is less likely to yield interesting trait relationships. Further, comparing modules across responses might identify interesting subsets of modules for further study. 
+For each trait, the `cellmean` and `noise` terms are uncorrelated, as are the `signal` and `rest` terms, which add up to the `cellmean`. That means their variances add up ($V_i = V_s + V_r + V_n$ and $V_c = V_s + V_r$), and the covariances of uncorrelated terms are 0 ($C_{cn} = 0, C_{sr} = 0$). This makes it possible later to compare across different datasets in interesting ways.
+
+Patterns emerge when comparing these components across traits within WGCNA modules. That is, a module identified with the `indivdual` response (the default approach) may represent primarily `signal`, which would be useful. However, if a module is primarily associated with `rest` or `noise`, it is less likely to yield interesting trait relationships. Further, comparing modules across responses might identify interesting subsets of modules for further study. 
 
 ```{r}
 datadir <- "."
 ```
 
 ```{r}
+datasets <- c("LivMet","PlaMet")
 responses <- c("individual","cellmean","signal","rest","noise")
 ```
 
@@ -58,7 +61,7 @@ shiny::fluidRow(
     6,
     shiny::selectInput(
       "dataset", "Dataset:",
-      c("LivMet","PlaMet"))),
+      datasets)),
   shiny::column(
     6,
     shiny::selectInput(
@@ -77,38 +80,24 @@ traitModule <- shiny::reactive({
 ```
 
 ```{r}
-DT::renderDataTable({
-  shiny::req(traitModule(), input$response)
-  dplyr::filter(
-    summary(traitModule()),
-    response == input$response)
-})
-```
-
-## Dendograms
-
-```{r}
 shiny::renderPlot({
   shiny::req(traitModule(), input$response)
   foundr::ggplot_listof_wgcnaModules(traitModule(), input$response)
 })
 ```
 
-# Module Comparisons
-
 ```{r}
 DT::renderDataTable({
   shiny::req(traitModule(), input$response)
-  dplyr::arrange(
-    tidyr::pivot_wider(
-      dplyr::select(
-        summary(traitModule()),
-        -maxkME, -minkME),
-      names_from = "response", values_from = "count",
-      values_fill = 0),
-    dplyr::desc(.data[[input$response]]))
+  DT::datatable(
+    dplyr::filter(
+      summary(traitModule()),
+      response == input$response),
+    options = list(paging =TRUE, pageLength = 5))
 })
 ```
+
+# Module Comparisons
 
 ```{r}
 mods <- shiny::reactive({
@@ -118,28 +107,33 @@ mods <- shiny::reactive({
 ```
 
 ```{r}
-cmodules <- shiny::reactive({
-  shiny::req(input$response)
-  levels(mods()[[paste0(input$response, "_col")]])
+fmodules <- shiny::reactive({
+  shiny::req(mods(), input$responseF)
+  levels(mods()[[paste0(input$responseF, "_col")]])
 })
 ```
 
 ```{r}
-fmodules <- shiny::reactive({
-  shiny::req(input$compare)
-  levels(mods()[[paste0(input$compare, "_col")]])
+cmodules <- shiny::reactive({
+  shiny::req(mods(), input$responseC)
+  levels(mods()[[paste0(input$responseC, "_col")]])
 })
 ```
 
 ```{r}
 shiny::fluidRow(
   shiny::column(
-    6,
+    4,
     shiny::selectInput(
-      "compare", "Facet Response:",
+      "responseF", "Facet Response:",
       "cellmean")),
   shiny::column(
-    6,
+    4,
+    shiny::selectInput(
+      "responseC", "Color Response:",
+      "individual")),
+  shiny::column(
+    2,
     checkboxInput("abs", "Absolute kME?")),
 )
 ```
@@ -147,32 +141,54 @@ shiny::fluidRow(
 ```{r}
 shiny::fluidRow(
   shiny::column(
-    6,
+    4,
     shiny::selectInput(
-      "cmodules", "Color Modules:",
+      "fmodules", "Facet Modules:",
       c("gray","turquoise"),
       multiple = TRUE)),
   shiny::column(
-    6,
+    4,
     shiny::selectInput(
-      "fmodules", "Facet Modules:",
+      "cmodules", "Color Modules:",
       c("gray","turquoise"),
       multiple = TRUE))
 )
 ```
 
 ```{r}
-compares <- shiny::reactive({
+responseFs <- shiny::reactive({
   shiny::req(input$response)
-  responses[responses != input$response]
+  unique(c(input$response, responses))
 })
+```
 
+```{r}
+responseCs <- shiny::reactive({
+  shiny::req(input$responseF)
+  responses[responses != input$responseF]
+})
 ```
 
 ```{r}
 shiny::observeEvent(
-  input$compare,
+  input$response,
   {
+    shiny::updateSelectInput(
+      session, "responseF",
+      choices = responseFs(),
+      selected = responseFs()[1])
+})
+```
+
+```{r}
+shiny::observeEvent(
+  input$responseF,
+  {
+    shiny::updateSelectInput(
+      session, "responseC",
+      choices = responseCs(),
+      selected = responseCs()[1])
+
     shiny::updateSelectInput(
       session, "fmodules",
       choices = fmodules(),
@@ -182,13 +198,8 @@ shiny::observeEvent(
 
 ```{r}
 shiny::observeEvent(
-  input$response,
+  input$responseC,
   {
-    shiny::updateSelectInput(
-      session, "compare",
-      choices = compares(),
-      selected = compares()[1])
-    
     shiny::updateSelectInput(
       session, "cmodules",
       choices = cmodules(),
@@ -197,22 +208,36 @@ shiny::observeEvent(
 ```
 
 ```{r}
-modplots <- shiny::reactive({
-  shiny::req(mods(), input$response, input$compare,
-             input$cmodules, input$fmodules)
-  dplyr::filter(
-    mods(),
-    .data[[paste0(input$response, "_col")]] %in% input$cmodules,
-    .data[[paste0(input$compare, "_col")]] %in% input$fmodules)
+moddata <- shiny::reactive({
+  shiny::req(mods(), input$responseF, input$responseC,
+             input$fmodules, input$cmodules)
+  
+  foundr::subset_module_kMEs(mods(), input$responseF, input$responseC,
+         facetmodules = input$fmodules, colormodules = input$cmodules)
 })
 ```
 
 ```{r}
 plotly::renderPlotly({
-  shiny::req(modplots(), input$response, input$compare)
+  shiny::req(moddata(), input$responseF, input$responseC)
   ggplot2::autoplot(
-    modplots(), input$response, input$compare,
-    input$abs)
+    moddata(), input$responseF, input$responseC, input$abs)
+})
+```
+
+```{r}
+DT::renderDataTable({
+  shiny::req(traitModule(), input$response)
+  DT::datatable(
+    dplyr::arrange(
+      tidyr::pivot_wider(
+        dplyr::select(
+          summary(traitModule()),
+          -maxkME, -minkME),
+        names_from = "response", values_from = "count",
+        values_fill = 0),
+      dplyr::desc(.data[[input$response]])),
+    options = list(paging =TRUE, pageLength = 5))
 })
 ```
 
@@ -220,18 +245,28 @@ plotly::renderPlotly({
 
 ```{r}
 eigens <- shiny::reactive({
+  shiny::req(traitModule())
   foundr::eigen_cor(traitModule())
 })
 ```
 
 ```{r}
-shiny::renderPlot({
-  shiny::req(eigens(), input$response, input$compare)
-  print(ggplot2::autoplot(eigens(), input$response, input$compare))
+plotly::renderPlotly({
+  shiny::req(eigens(), input$responseF, input$responseC)
+  print(ggplot2::autoplot(eigens(), input$responseC, input$responseF))
 })
 ```
 
 The sign of correlation of modules could provide adjustment to direction in kME plots above. However, using the absolute value seems to show the strong relationship (or not).
+
+```{r}
+DT::renderDataTable({
+  shiny::req(eigens(), input$responseF, input$responseC)
+  DT::datatable(
+    foundr::subset_eigen_cor(eigens(), input$responseC, input$responseF),
+    options = list(paging =TRUE, pageLength = 5))
+})
+```
 
 # Download Data
 
@@ -239,20 +274,162 @@ The sign of correlation of modules could provide adjustment to direction in kME 
 shiny::downloadHandler(
   filename = "blah.csv",
   content = function(file) {
-    req(modplots())
-    write.csv(modplots(), file)
+    req(moddata())
+    write.csv(moddata(), file)
   }
 )
 ```
 
 ```{r}
 DT::renderDataTable({
-  shiny::req(modplots())
+  shiny::req(moddata())
   dplyr::mutate(
-    modplots(),
+    moddata(),
     dplyr::across(
       dplyr::where(is.numeric),
       function(x) signif(x, 4)))
+})
+```
+
+# Compare Datasets
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    4,
+    shiny::selectInput(
+      "datasetD", "Facet Dataset:",
+      datasets)),
+  shiny::column(
+    4,
+    shiny::selectInput(
+      "responseD", "Dataset Response:",
+      responses)),
+  shiny::column(
+    2,
+    checkboxInput("absD", "Absolute kME?")),
+)
+```
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    4,
+    shiny::selectInput(
+      "fmodules2", "Facet Modules:",
+      c("gray","turquoise"),
+      multiple = TRUE)),
+  shiny::column(
+    4,
+    shiny::selectInput(
+      "cmodules2", "Color Modules:",
+      c("gray","turquoise"),
+      multiple = TRUE))
+)
+```
+
+```{r}
+dataset2 <- shiny::reactive({
+  shiny::req(input$datasetD)
+  datasets[input$datasetD != datasets][1]
+})
+```
+
+```{r}
+fmodules2 <- shiny::reactive({
+  shiny::req(metmods(), input$datasetD)
+  levels(metmods()[[paste0(input$datasetD, "_col")]])
+})
+```
+
+```{r}
+cmodules2 <- shiny::reactive({
+  shiny::req(metmods(), dataset2())
+  levels(metmods()[[paste0(dataset2(), "_col")]])
+})
+```
+
+```{r}
+shiny::observeEvent(
+  input$datasetD,
+  {
+    shiny::updateSelectInput(
+      session, "fmodules2",
+      choices = fmodules2(),
+      selected = fmodules2())
+})
+```
+
+```{r}
+shiny::observeEvent(
+  dataset2(),
+  {
+    shiny::updateSelectInput(
+      session, "cmodules2",
+      choices = cmodules2(),
+      selected = cmodules2())
+})
+```
+
+```{r}
+traitModule1 <- shiny::reactive({
+  shiny::req(input$datasetD)
+  readRDS(file.path(datadir, paste0(input$datasetD, "Module.rds")))
+})
+```
+
+```{r}
+traitModule2 <- shiny::reactive({
+  shiny::req(dataset2())
+  readRDS(file.path(datadir, paste0(dataset2(), "Module.rds")))
+})
+```
+
+```{r}
+dmods <- shiny::reactive({
+  shiny::req(input$datasetD, dataset2(), traitModule1(), traitModule2(), input$responseD)
+
+  out <- list(traitModule1(), traitModule2())
+  names(out) <- c(input$datasetD, dataset2())
+  foundr::join_dataset_modules(out, input$responseD)
+})
+```
+
+```{r}
+metmods <- shiny::reactive({
+  shiny::req(dmods())
+  foundr::module_kMEs(dmods())
+})
+```
+
+```{r}
+moddata2 <- shiny::reactive({
+  shiny::req(metmods(), input$datasetD, dataset2(),
+             input$fmodules2, input$cmodules2)
+  
+  foundr::subset_module_kMEs(metmods(), input$datasetD, dataset2(),
+         facetmodules = input$fmodules2, colormodules = input$cmodules2)
+})
+```
+
+```{r}
+plotly::renderPlotly({
+  shiny::req(metmods(), dataset2(), input$datasetD, traitModule2(), traitModule1())
+  ggplot2::autoplot(moddata2(), input$datasetD, dataset2(), input$absD)
+})
+```
+
+```{r}
+eigenMet <- shiny::reactive({
+  shiny::req(dmods())
+  foundr::eigen_cor(dmods())
+})
+```
+
+```{r}
+plotly::renderPlotly({
+  shiny::req(eigenMet(), dataset2(), input$datasetD)
+  ggplot2::autoplot(eigenMet(), dataset2(), input$datasetD)
 })
 ```
 
