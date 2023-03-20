@@ -1,0 +1,258 @@
+---
+title: "WGCNA Visualization"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+runtime: shiny
+params:
+  echo: no
+resource_files:
+- PlaMetModule.rds
+- LivMetModule.rds
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = params$echo, warning = FALSE, message = FALSE)
+```
+
+```{r}
+devtools::install_cran("plotly") # plotly not yet on UW dataviz
+devtools::install_cran("markdown") # markdown not yet on UW dataviz
+devtools::install_cran("cowplot") # patchwork not yet on UW dataviz
+devtools::install_cran("patchwork") # patchwork not yet on UW dataviz
+#devtools::install_github("byandell/foundr")
+```
+
+```{r}
+options(stringsAsFactors = FALSE)
+```
+
+This document selects a `dataset` and creates WGCNA modules. Selecting a `response` (among `individual`, `cellmean`, `signal`, `ind_signal`) enables visualization of stats for the modules as well as the WGCNA dendogram and color panel. Selects a response to `compare` enables comparison of two types of WGCNA modules. The first figure plots kMEs by `response` and `compare` across their modules (which can be subsetted).
+The second one shows correlation of eigentraits across `response` and `compare` choices. Data can be downloaded by clicking the button.
+
+### Explanation of Responses
+
+The response for each trait can be partitioned into uncorrelated pieces that
+have useful interpretations. Letting `individual` be the individual organism response for a trait, it is partitioned into the `cellmean` and `noise`. The `cellmean` is the part of the response explained by the model, and the `noise` is the residual. The `cellmean` can be decomposed into main effects and interactions involving the factors `strain`, `sex` and `condition`. However, generally we are interested in whether there are different `strain` responses to `condition`, in which case we are interested in the `signal` composed of `strain:condition` and `strain:sex:condition` interactions, with the `rest` of the model components conveniently combined.
+
+```
+individual = cellmean + noise =
+individual = signal + rest + noise
+cellmean = signal + rest
+signal = strain:condition + strain:sex:condition
+```
+
+The `cellmean` and `noise` are uncorrelated, as are the `signal` and `rest` which add up to the `cellmean`. When we might see some patterns when comparing these components across traits within WGCNA modules. That is, a module identified with the `indivdual` response (the default approach) may represent primarily `signal`, which would be useful. However, if a module is primarily associated with `rest` or `noise`, it is less likely to yield interesting trait relationships. Further, comparing modules across responses might identify interesting subsets of modules for further study. 
+
+```{r}
+datadir <- "."
+```
+
+```{r}
+responses <- c("individual","cellmean","signal","rest","noise")
+```
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    6,
+    shiny::selectInput(
+      "dataset", "Dataset:",
+      c("LivMet","PlaMet"))),
+  shiny::column(
+    6,
+    shiny::selectInput(
+      "response", "Response:",
+      responses))
+)
+```
+
+# WGCNA 
+
+```{r}
+traitModule <- shiny::reactive({
+  shiny::req(input$dataset)
+  readRDS(file.path(datadir, paste0(input$dataset, "Module.rds")))
+})
+```
+
+```{r}
+DT::renderDataTable({
+  shiny::req(traitModule(), input$response)
+  dplyr::filter(
+    summary(traitModule()),
+    response == input$response)
+})
+```
+
+## Dendograms
+
+```{r}
+shiny::renderPlot({
+  shiny::req(traitModule(), input$response)
+  foundr::ggplot_listof_wgcnaModules(traitModule(), input$response)
+})
+```
+
+# Module Comparisons
+
+```{r}
+DT::renderDataTable({
+  shiny::req(traitModule(), input$response)
+  dplyr::arrange(
+    tidyr::pivot_wider(
+      dplyr::select(
+        summary(traitModule()),
+        -maxkME, -minkME),
+      names_from = "response", values_from = "count",
+      values_fill = 0),
+    dplyr::desc(.data[[input$response]]))
+})
+```
+
+```{r}
+mods <- shiny::reactive({
+  shiny::req(traitModule())
+  foundr::module_kMEs(traitModule())
+})
+```
+
+```{r}
+cmodules <- shiny::reactive({
+  shiny::req(input$response)
+  levels(mods()[[paste0(input$response, "_col")]])
+})
+```
+
+```{r}
+fmodules <- shiny::reactive({
+  shiny::req(input$compare)
+  levels(mods()[[paste0(input$compare, "_col")]])
+})
+```
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    6,
+    shiny::selectInput(
+      "compare", "Facet Response:",
+      "cellmean")),
+  shiny::column(
+    6,
+    checkboxInput("abs", "Absolute kME?")),
+)
+```
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    6,
+    shiny::selectInput(
+      "cmodules", "Color Modules:",
+      c("gray","turquoise"),
+      multiple = TRUE)),
+  shiny::column(
+    6,
+    shiny::selectInput(
+      "fmodules", "Facet Modules:",
+      c("gray","turquoise"),
+      multiple = TRUE))
+)
+```
+
+```{r}
+compares <- shiny::reactive({
+  shiny::req(input$response)
+  responses[responses != input$response]
+})
+
+```
+
+```{r}
+shiny::observeEvent(
+  input$compare,
+  {
+    shiny::updateSelectInput(
+      session, "fmodules",
+      choices = fmodules(),
+      selected = fmodules())
+})
+```
+
+```{r}
+shiny::observeEvent(
+  input$response,
+  {
+    shiny::updateSelectInput(
+      session, "compare",
+      choices = compares(),
+      selected = compares()[1])
+    
+    shiny::updateSelectInput(
+      session, "cmodules",
+      choices = cmodules(),
+      selected = cmodules())
+})
+```
+
+```{r}
+modplots <- shiny::reactive({
+  shiny::req(mods(), input$response, input$compare,
+             input$cmodules, input$fmodules)
+  dplyr::filter(
+    mods(),
+    .data[[paste0(input$response, "_col")]] %in% input$cmodules,
+    .data[[paste0(input$compare, "_col")]] %in% input$fmodules)
+})
+```
+
+```{r}
+plotly::renderPlotly({
+  shiny::req(modplots(), input$response, input$compare)
+  ggplot2::autoplot(
+    modplots(), input$response, input$compare,
+    input$abs)
+})
+```
+
+# Eigentrait Correlations
+
+```{r}
+eigens <- shiny::reactive({
+  foundr::eigen_cor(traitModule())
+})
+```
+
+```{r}
+shiny::renderPlot({
+  shiny::req(eigens(), input$response, input$compare)
+  print(ggplot2::autoplot(eigens(), input$response, input$compare))
+})
+```
+
+The sign of correlation of modules could provide adjustment to direction in kME plots above. However, using the absolute value seems to show the strong relationship (or not).
+
+# Download Data
+
+```{r}
+shiny::downloadHandler(
+  filename = "blah.csv",
+  content = function(file) {
+    req(modplots())
+    write.csv(modplots(), file)
+  }
+)
+```
+
+```{r}
+DT::renderDataTable({
+  shiny::req(modplots())
+  dplyr::mutate(
+    modplots(),
+    dplyr::across(
+      dplyr::where(is.numeric),
+      function(x) signif(x, 4)))
+})
+```
+

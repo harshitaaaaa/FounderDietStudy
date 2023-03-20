@@ -13,3 +13,4 @@ rsconnect/
 *.docx
 *.pptx
 RawData/
+inst/
