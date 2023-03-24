@@ -29,17 +29,25 @@ for(filename in list.files("R", full.names = TRUE)) {
 links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
 ```
 
+## Physio: Physiological traits
+
 ```{r}
 harmonize("Physio", links, PhysioHarmony)
 ```
+
+## PlaMet: Plasma metabolites
 
 ```{r warning = FALSE}
 harmonize("PlaMet", links, MetHarmony, skiprows = 4, skipcols = 4)
 ```
 
+## LivMet: Liver metabolites
+
 ```{r warning = FALSE}
 harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
 ```
+
+## LivRna: Liver mRNA expression
 
 The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`. Needed for `LivRna`.
 
@@ -61,7 +69,20 @@ liverAnnot <- read_csv(liverAnnot)
 harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot)
 ```
 
+## Module: WGCNA module eigentraits
+
+See <WGCNA.Rmd> for construction of `traitModule`.
+
 ```{r}
-bind_traits(c("Physio","PlaMet","LivMet","LivRna"))
+traitModule <- readRDS("traitModule.rds")
+```
+
+```{r}
+harmonize("Module", links, foundr::moduleHarmony,
+          traitModule)
+```
+
+```{r}
+bind_traits(c("Physio","PlaMet","LivMet","LivRna","Module"))
 ```
 

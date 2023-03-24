@@ -1,0 +1,340 @@
+---
+title: "WGCNA"
+author: "Brian Yandell"
+date: "2023-03-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+options(stringsAsFactors = FALSE)
+```
+
+```{r eval = FALSE}
+# Need VPN and connection to ResearchDrive server
+
+RD <- "/Volumes/adattie/General"
+RDdir <- file.path(RD, "PersonalSharedFolder2/Mark/DO_multitissue")
+list.files(RDdir, "*.R$")
+```
+
+```{r eval = FALSE}
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("GO.db")
+BiocManager::install("impute")
+BiocManager::install("preprocessCore")
+```
+
+```{r}
+datadir <- "~/Documents/Research/attie_alan/FounderDietStudy"
+setwd(datadir)
+datadir <- "."
+```
+
+# WGCNA 
+
+Individual values
+
+```{r}
+if(file.exists(filename <- file.path(datadir, "LivMetModule.rds"))) {
+  LivMetModule <- readRDS(filename)
+} else {
+  LivMetData <- readRDS(file.path(datadir, "LivMetData.rds"))
+  LivMetSignal <- readRDS(file.path(datadir, "LivMetSignal.rds"))
+  LivMetModule <- modulr::listof_wgcnaModules(LivMetData, LivMetSignal)
+  saveRDS(LivMetModule, filename)
+}
+```
+
+```{r}
+if(file.exists(filename <- file.path(datadir, "PlaMetModule.rds"))) {
+  PlaMetModule <- readRDS(filename)
+} else {
+  PlaMetData <- readRDS(file.path(datadir, "PlaMetData.rds"))
+  PlaMetSignal <- readRDS(file.path(datadir, "PlaMetSignal.rds"))
+  PlaMetModule <- modulr::listof_wgcnaModules(PlaMetData, PlaMetSignal)
+  saveRDS(PlaMetModule, filename)
+}
+```
+
+```{r warning = FALSE, message = FALSE}
+if(file.exists(filename <- file.path(datadir, "LivRnaModule.rds"))) {
+  LivRnaModule <- readRDS(filename)
+} else {
+  LivRnaData <- readRDS(file.path(datadir, "LivRnaData.rds"))
+  LivRnaSignal <- readRDS(file.path(datadir, "LivRnaSignal.rds"))
+  LivRnaModule <- modulr::listof_wgcnaModules(LivRnaData, LivRnaSignal)
+  saveRDS(LivRnaModule, filename)
+}
+```
+
+```{r}
+if(file.exists(filename <- file.path(datadir, "traitModule.rds"))) {
+  traitModule <- readRDS(filename)
+} else {
+  traitModule <- list(
+    LivMet = readRDS(file.path(datadir, "LivMetModule.rds")),
+    PlaMet = readRDS(file.path(datadir, "PlaMetModule.rds")),
+    LivRna = readRDS(file.path(datadir, "LivRnaModule.rds")))
+  saveRDS(traitModule, filename)
+}
+```
+
+```{r}
+summary(LivMetModule, "signal")
+```
+
+# Module Harmony
+
+```{r}
+moduleData <- 
+  dplyr::mutate(
+    foundr::moduleHarmony("Module",, traitModule, response = "value"),
+    dataset = "Module")
+```
+
+```{r}
+moduleStats <- foundr::strainstats(moduleData)
+```
+
+```{r}
+moduleSignal <- foundr::partition(moduleData)
+```
+
+```{r}
+(modstats <- dplyr::arrange(
+  tidyr::pivot_wider(
+  dplyr::mutate(
+    dplyr::select(
+      dplyr::filter(
+        moduleStats,
+        !(trait %in% c("grey")),
+        term %in% c("signal","cellmean","rest")),
+      -SD),
+    p.value = signif(-log10(p.value), 3)),
+  names_from = "term", values_from = "p.value"),
+dplyr::desc(signal)))
+```
+
+```{r}
+(traits <-
+   dplyr::filter(
+     tidyr::unite(
+       modstats,
+       datatraits,
+       dataset, trait,
+       sep = ": "),
+     signal > 1)$datatraits)
+```
+
+```{r}
+moduleSolo <- foundr::traitSolos(
+  moduleData, moduleSignal, response = "cellmean",
+  traitnames = traits[1:4])
+```
+
+Cell mean for top LivMet and PlaMet module
+
+```{r}
+foundr::ggplot_traitSolos(moduleSolo)
+```
+
+```{r}
+moduleSolo <- foundr::traitSolos(
+  moduleData, moduleSignal, response = "signal",
+  traitnames = traits[1:4])
+```
+
+Signal for top LivMet and PlaMet module
+
+```{r}
+foundr::ggplot_traitSolos(moduleSolo)
+```
+
+```{r}
+traitData <- readRDS(file.path(datadir, "traitData.rds"))
+traitSignal <- readRDS(file.path(datadir, "traitSignal.rds"))
+```
+
+### LivMet greenyellow module
+
+```{r}
+(GYLivMet <- 
+  dplyr::arrange(
+    dplyr::filter(
+      traitModule$LivMet$value$modules,
+      module == "greenyellow"),
+    dplyr::desc(abs(kME))))
+```
+
+```{r}
+GYSolo <- foundr::traitSolos(
+  traitData, traitSignal, response = "cellmean",
+  traitnames = paste("LivMet", GYLivMet$trait[1], sep = ": "))
+```
+
+```{r}
+foundr::ggplot_traitSolos(GYSolo)
+```
+
+```{r}
+foundr::ggplot_traitSolos(GYSolo, facet_strain = TRUE)
+```
+
+### LivMet black module
+
+```{r}
+(BlLivMet <- 
+  dplyr::arrange(
+    dplyr::filter(
+      traitModule$LivMet$value$modules,
+      module == "black"),
+    dplyr::desc(abs(kME))))
+```
+
+```{r}
+BlSolo <- foundr::traitSolos(
+  traitData, traitSignal, response = "cellmean",
+  traitnames = paste("LivMet", BlLivMet$trait[2], sep = ": "))
+```
+
+```{r}
+foundr::ggplot_traitSolos(GYSolo)
+```
+
+```{r}
+BlSolo <- foundr::traitSolos(
+  traitData, traitSignal, response = "signal",
+  traitnames = paste("LivMet", BlLivMet$trait[2], sep = ": "))
+```
+
+```{r}
+foundr::ggplot_traitSolos(GYSolo)
+```
+
+## Plots
+
+```{r}
+modband <- foundr::module_band(LivMetModule, "signal")
+```
+
+```{r}
+foundr::ggplot_module_band(modband)
+```
+
+```{r warning = FALSE, message = FALSE}
+foundr::ggplot_listof_wgcnaModules(LivMetModule)
+```
+Standard plot.
+
+```{r}
+plot(LivMetModule$value)
+```
+
+# Module Comparisons
+
+```{r}
+mods <- foundr::module_kMEs(LivMetModule)
+```
+
+```{r}
+subset(mods, "signal", "cellmean", "blue")
+```
+
+```{r}
+dplyr::arrange(
+    dplyr::count(
+      mods,
+      value_col),
+    dplyr::desc(n))
+```
+
+
+```{r}
+ggplot2::autoplot(mods, "value", "cellmean")
+```
+
+```{r}
+plotly::ggplotly(ggplot2::autoplot(mods, "value", "cellmean", abskME = TRUE,
+                  facetmodules = "blue"))
+```
+
+# Eigentraits
+
+```{r}
+eigens <- foundr::eigen_cor(LivMetModule)
+```
+
+```{r}
+subset(eigens, "value", "signal")
+```
+
+```{r}
+ggplot2::autoplot(eigens, "value", "cellmean")
+```
+
+The sign of correlation of modules could provide adjustment to direction in kME plots above. However, using the absolute value seems to show the strong relationship (or not).
+
+# Compare Datasets
+
+```{r}
+dmods <- list(LivMet = LivMetModule, PlaMet = PlaMetModule)
+response <- "value"
+```
+
+```{r}
+valueMet <- foundr::join_dataset_modules(dmods, response)
+```
+
+```{r}
+metmods <- foundr::module_kMEs(valueMet)
+```
+
+```{r}
+plotly::ggplotly(
+  ggplot2::autoplot(metmods, "LivMet", "PlaMet"))
+```
+
+```{r}
+traitData <- 
+  dplyr::filter(
+      readRDS(file.path(datadir, "traitData.rds")),
+      dataset %in% c("LivMet","PlaMet"))
+traitSignal <-
+    dplyr::filter(
+      readRDS(file.path(datadir, "traitSignal.rds")),
+      dataset %in% c("LivMet","PlaMet"))
+```
+
+```{r}
+soloData <- 
+  foundr::traitSolos(
+    dplyr::filter(
+      traitData,
+      trait == trait[1]),
+    dplyr::filter(
+      traitSignal,
+      trait == trait[1]))
+```
+
+```{r}
+DT::datatable(soloData)
+```
+
+```{r}
+foundr::ggplot_traitPairs(
+  foundr::traitPairs(soloData))
+```
+
+```{r}
+eigenMet <- foundr::eigen_cor(valueMet)
+```
+
+```{r}
+ggplot2::autoplot(eigenMet, "LivMet", "PlaMet")
+```
+

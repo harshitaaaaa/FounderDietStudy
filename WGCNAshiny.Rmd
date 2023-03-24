@@ -7,8 +7,9 @@ runtime: shiny
 params:
   echo: no
 resource_files:
-- PlaMetModule.rds
-- LivMetModule.rds
+- traitModule.rds
+- traitData.rds
+- traitSignal.rds
 ---
 
 ```{r setup, include=FALSE}
@@ -33,14 +34,18 @@ This document selects a `dataset` and creates WGCNA modules. Selecting a `respon
 ### Explanation of Responses
 
 The response for each trait can be partitioned into uncorrelated pieces that
-have useful interpretations. Letting `individual` be the individual organism response for a trait, it is partitioned into the `cellmean` and `noise`. The `cellmean` is the part of the response explained by the model, and the `noise` is the residual. The `cellmean` can be decomposed into main effects and interactions involving the factors `strain`, `sex` and `condition`. However, generally we are interested in whether there are different `strain` responses to `condition`, in which case we are interested in the `signal` composed of `strain:condition` and `strain:sex:condition` interactions, with the `rest` of the model components conveniently combined.
+have useful interpretations. Letting `value` be the trait value for an organism, it is partitioned into the `cellmean` and `noise`. The `cellmean` is the part of the response explained by the model, and the `noise` is the residual. The `cellmean` can be decomposed into main effects and interactions involving the factors `strain`, `sex` and `condition`. However, generally we are interested in whether there are different `strain` responses to `condition`, in which case we are interested in the `signal` composed of `strain:condition` and `strain:sex:condition` interactions, with the `rest` of the model components conveniently combined.
 
+<center>
 ```
-individual = cellmean + noise =
-individual = signal + rest + noise
+value = cellmean + noise
 cellmean = signal + rest
+value = signal + rest + noise
+
 signal = strain:condition + strain:sex:condition
+rest = strain + sex + condition + strain:sex + sex:condition
 ```
+</center>
 
 For each trait, the `cellmean` and `noise` terms are uncorrelated, as are the `signal` and `rest` terms, which add up to the `cellmean`. That means their variances add up ($V_i = V_s + V_r + V_n$ and $V_c = V_s + V_r$), and the covariances of uncorrelated terms are 0 ($C_{cn} = 0, C_{sr} = 0$). This makes it possible later to compare across different datasets in interesting ways.
 
@@ -52,7 +57,22 @@ datadir <- "."
 
 ```{r}
 datasets <- c("LivMet","PlaMet")
-responses <- c("individual","cellmean","signal","rest","noise")
+responses <- c("value","cellmean","signal","rest","noise")
+```
+
+```{r}
+traitModule <- readRDS(file.path(datadir, "traitModule.rds"))
+```
+
+```{r}
+traitData <- 
+  dplyr::filter(
+      readRDS(file.path(datadir, "traitData.rds")),
+      dataset %in% datasets)
+traitSignal <-
+    dplyr::filter(
+      readRDS(file.path(datadir, "traitSignal.rds")),
+      dataset %in% datasets)
 ```
 
 ```{r}
@@ -73,25 +93,18 @@ shiny::fluidRow(
 # WGCNA 
 
 ```{r}
-traitModule <- shiny::reactive({
-  shiny::req(input$dataset)
-  readRDS(file.path(datadir, paste0(input$dataset, "Module.rds")))
-})
-```
-
-```{r}
 shiny::renderPlot({
-  shiny::req(traitModule(), input$response)
-  foundr::ggplot_listof_wgcnaModules(traitModule(), input$response)
+  shiny::req(input$dataset, input$response)
+  foundr::ggplot_listof_wgcnaModules(traitModule[[input$dataset]], input$response)
 })
 ```
 
 ```{r}
 DT::renderDataTable({
-  shiny::req(traitModule(), input$response)
+  shiny::req(input$dataset, input$response)
   DT::datatable(
     dplyr::filter(
-      summary(traitModule()),
+      summary(traitModule[[input$dataset]]),
       response == input$response),
     options = list(paging =TRUE, pageLength = 5))
 })
@@ -101,8 +114,8 @@ DT::renderDataTable({
 
 ```{r}
 mods <- shiny::reactive({
-  shiny::req(traitModule())
-  foundr::module_kMEs(traitModule())
+  shiny::req(input$dataset)
+  foundr::module_kMEs(traitModule[[input$dataset]])
 })
 ```
 
@@ -131,10 +144,7 @@ shiny::fluidRow(
     4,
     shiny::selectInput(
       "responseC", "Color Response:",
-      "individual")),
-  shiny::column(
-    2,
-    checkboxInput("abs", "Absolute kME?")),
+      "value"))
 )
 ```
 
@@ -151,7 +161,10 @@ shiny::fluidRow(
     shiny::selectInput(
       "cmodules", "Color Modules:",
       c("gray","turquoise"),
-      multiple = TRUE))
+      multiple = TRUE)),
+  shiny::column(
+    2,
+    checkboxInput("abs", "Absolute kME?"))
 )
 ```
 
@@ -220,19 +233,21 @@ moddata <- shiny::reactive({
 ```{r}
 plotly::renderPlotly({
   shiny::req(moddata(), input$responseF, input$responseC)
-  ggplot2::autoplot(
-    moddata(), input$responseF, input$responseC, input$abs)
+  print(
+    ggplot2::autoplot(
+      moddata(),
+      input$responseF, input$responseC, input$abs))
 })
 ```
 
 ```{r}
 DT::renderDataTable({
-  shiny::req(traitModule(), input$response)
+  shiny::req(input$dataset, input$response)
   DT::datatable(
     dplyr::arrange(
       tidyr::pivot_wider(
         dplyr::select(
-          summary(traitModule()),
+          summary(traitModule[[input$dataset]]),
           -maxkME, -minkME),
         names_from = "response", values_from = "count",
         values_fill = 0),
@@ -245,15 +260,20 @@ DT::renderDataTable({
 
 ```{r}
 eigens <- shiny::reactive({
-  shiny::req(traitModule())
-  foundr::eigen_cor(traitModule())
+  shiny::req(input$dataset)
+  foundr::eigen_cor(traitModule[[input$dataset]])
 })
 ```
 
 ```{r}
 plotly::renderPlotly({
   shiny::req(eigens(), input$responseF, input$responseC)
-  print(ggplot2::autoplot(eigens(), input$responseC, input$responseF))
+  print(
+    ggplot2::autoplot(
+      eigens(),
+      input$responseF, input$responseC,
+      facetmodules = input$fmodules,
+      colormodules = input$cmodules))
 })
 ```
 
@@ -304,10 +324,7 @@ shiny::fluidRow(
     4,
     shiny::selectInput(
       "responseD", "Dataset Response:",
-      responses)),
-  shiny::column(
-    2,
-    checkboxInput("absD", "Absolute kME?")),
+      responses))
 )
 ```
 
@@ -324,7 +341,10 @@ shiny::fluidRow(
     shiny::selectInput(
       "cmodules2", "Color Modules:",
       c("gray","turquoise"),
-      multiple = TRUE))
+      multiple = TRUE)),
+  shiny::column(
+    2,
+    checkboxInput("absD", "Absolute kME?"))
 )
 ```
 
@@ -372,26 +392,12 @@ shiny::observeEvent(
 ```
 
 ```{r}
-traitModule1 <- shiny::reactive({
-  shiny::req(input$datasetD)
-  readRDS(file.path(datadir, paste0(input$datasetD, "Module.rds")))
-})
-```
-
-```{r}
-traitModule2 <- shiny::reactive({
-  shiny::req(dataset2())
-  readRDS(file.path(datadir, paste0(dataset2(), "Module.rds")))
-})
-```
-
-```{r}
 dmods <- shiny::reactive({
-  shiny::req(input$datasetD, dataset2(), traitModule1(), traitModule2(), input$responseD)
+  shiny::req(input$datasetD, dataset2(), input$responseD)
 
-  out <- list(traitModule1(), traitModule2())
-  names(out) <- c(input$datasetD, dataset2())
-  foundr::join_dataset_modules(out, input$responseD)
+  foundr::join_dataset_modules(
+    traitModule[c(input$datasetD, dataset2())],
+    input$responseD)
 })
 ```
 
@@ -407,15 +413,76 @@ moddata2 <- shiny::reactive({
   shiny::req(metmods(), input$datasetD, dataset2(),
              input$fmodules2, input$cmodules2)
   
-  foundr::subset_module_kMEs(metmods(), input$datasetD, dataset2(),
-         facetmodules = input$fmodules2, colormodules = input$cmodules2)
+  foundr::subset_module_kMEs(
+    metmods(), input$datasetD, dataset2(),
+    facetmodules = input$fmodules2,
+    colormodules = input$cmodules2)
 })
 ```
 
 ```{r}
 plotly::renderPlotly({
-  shiny::req(metmods(), dataset2(), input$datasetD, traitModule2(), traitModule1())
-  ggplot2::autoplot(moddata2(), input$datasetD, dataset2(), input$absD)
+  shiny::req(moddata2(), input$datasetD, dataset2())
+  if(is.null(moddata2()))
+    plot_null("no moddata2 data")
+  else {
+  plotly::event_register(
+    plotly::ggplotly(
+      print(
+        ggplot2::autoplot(
+          moddata2(),
+          input$datasetD, dataset2(), input$absD))),
+      "plotly_click")
+  }
+})
+```
+
+```{r}
+pointKey <- reactive({
+  shiny::req(moddata2())
+  point <- plotly::event_data(
+    event = "plotly_click", priority = "event")
+  shiny::req(point) # to avoid error if no point is clicked
+  point$key
+})
+```
+
+```{r}
+shiny::renderTable({
+  shiny::req(moddata2(), pointKey())
+  dplyr::filter(
+    moddata2(),
+    trait == pointKey()) # use the key to find selected point
+})
+```
+
+```{r}
+pairData <- shiny::reactive({
+  shiny::req(pointKey())
+  foundr::traitSolos(
+    dplyr::filter(
+      traitData,
+      trait == pointKey()),
+    dplyr::filter(
+      traitSignal,
+      trait == pointKey()))
+})
+```
+
+```{r}
+shiny::renderPlot({
+  shiny::req(pairData())
+  foundr::ggplot_traitPairs(
+    foundr::traitPairs(pairData()))
+})
+```
+
+```{r}
+DT::renderDataTable({
+  shiny::req(pairData(), pointKey())
+  DT::datatable(
+    pairData(),
+    options = list(paging =TRUE, pageLength = 5))
 })
 ```
 
@@ -429,7 +496,12 @@ eigenMet <- shiny::reactive({
 ```{r}
 plotly::renderPlotly({
   shiny::req(eigenMet(), dataset2(), input$datasetD)
-  ggplot2::autoplot(eigenMet(), dataset2(), input$datasetD)
+  print(
+    ggplot2::autoplot(
+      eigenMet(),
+      input$datasetD, dataset2(),
+      facetmodules = input$fmodules2,
+      colormodules = input$cmodules2))
 })
 ```
 
