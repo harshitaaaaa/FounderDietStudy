@@ -69,6 +69,12 @@ liverAnnot <- read_csv(liverAnnot)
 harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot)
 ```
 
+## Enrich: Plasma enrichment over time
+
+```{r}
+harmonize("Enrich", links, EnrichHarmony, annot)
+```
+
 ## Module: WGCNA module eigentraits
 
 See <WGCNA.Rmd> for construction of `traitModule`.
@@ -83,6 +89,6 @@ harmonize("Module", links, foundr::moduleHarmony,
 ```
 
 ```{r}
-bind_traits(c("Physio","PlaMet","LivMet","LivRna","Module"))
+bind_traits(c("Physio","PlaMet","LivMet","LivRna","Module","Enrich"))
 ```
 

@@ -4,6 +4,7 @@ This study has two diets (`HC_LF` = high carb, low fat; `HF_LC` = high fat, low 
 - `LivMet`: Liver metabolites
 - `LivRna`: Liver gene expression (RNA-seq)
 - `Physio`: Physiological traits
+- `Enrich`: Plasma enrichment
 - `Module`: WGCNA module eigentraits
 
 See also

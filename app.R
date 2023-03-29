@@ -4,7 +4,7 @@ devtools::install_cran("markdown") #  not yet on UW dataviz
 devtools::install_cran("cowplot") #  not yet on UW dataviz
 devtools::install_cran("patchwork") #  not yet on UW dataviz
 devtools::install_cran("ggdendro") #  not yet on UW dataviz
-#devtools::install_github("byandell/foundr")
+devtools::install_github("byandell/foundr")
 library(foundr)
 
 traitData <- readRDS("traitData.rds")
@@ -18,6 +18,7 @@ customSettings <- list(
     LivMet = "Liver metabolites",
     LivRna = "Liver gene expression",
     Physio = "Physiological traits",
+    Enrich = "Plasma enrichment",
     Module = "WGCNA Module eigentraits",
     uploaded = "Uploaded"))
 
