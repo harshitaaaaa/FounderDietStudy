@@ -424,7 +424,7 @@ moddata2 <- shiny::reactive({
 plotly::renderPlotly({
   shiny::req(moddata2(), input$datasetD, dataset2())
   if(is.null(moddata2()))
-    plot_null("no moddata2 data")
+    foundr::plot_null("no moddata2 data")
   else {
   plotly::event_register(
     plotly::ggplotly(

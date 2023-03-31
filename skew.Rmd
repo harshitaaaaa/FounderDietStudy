@@ -1,0 +1,268 @@
+---
+title: "Skewness and Kurtosis"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+runtime: shiny
+params:
+  echo: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = params$echo, warning = FALSE, message = FALSE)
+```
+
+```{r}
+devtools::install_github("byandell/foundr")
+```
+
+This little study shows the value of using normal scores. Normal data has a skewness of 0 and a kurtosis of 3. Positive skewness (> 1) indicates skew to the right (Long right tails of large values) while negative skewness (< -1) signifies skew to the left (long left tails). Large kurtosis (> 5) means a flat-topped distribution while small kurtosis (< 1) means a skinny, pointed distribution.
+
+Skewness and kurtosis are plotted below, one point per trait for the original values (value on right) and for the residual (noise on left) after removing the cellmean (mean by strait, sex, condition). The first plot pair in each section is for the original data, without normal scores, while the second plot is with normal scores transformation. In all cases, the skewness and kurtoses of traits for the normal scores value facet are all at 0 and 3, respectively. Note that the noise for data with normal scores vary but not hugely from what is expected for normal data; the variation suggests the normal scores overcorrects for the factor effects, but not enough to be a problem.
+
+Note that physiological traits are generally skewed to the right while metabolite traits are typically skewed to the left. That suggests that most physiological traits, which include many concentrations, need some transformation (log or square root), while metabolites might have been too strongly transformed (say with log when no transformation or square root would have worked).
+
+General conclusion is that normal scores remain valuable.
+
+```{r}
+skewkurt <- function(traitData, traitSignal, main) {
+  object <-
+    dplyr::ungroup(
+      dplyr::summarize(
+        dplyr::group_by(
+          tidyr::pivot_longer(
+            dplyr::select(
+              dplyr::mutate(
+                dplyr::left_join(
+                  traitData,
+                  traitSignal,
+                  by = c("strain", "sex", "condition", "trait")),
+                noise = .data$value - .data$cellmean),
+              strain, sex, condition, trait, value, noise),
+            value:noise,
+            names_to = "response", values_to = "value"),
+          trait, response),
+        skew = moments::skewness(.data$value, na.rm = TRUE),
+        kurt = moments::kurtosis(.data$value, na.rm = TRUE),
+        .groups = "drop"))
+
+  ggplot2::ggplot(object) +
+    ggplot2::aes(.data$skew, .data$kurt, key = .data$trait) +
+    ggplot2::facet_wrap(~ response) +
+    ggplot2::geom_point() +
+    ggplot2::geom_hline(yintercept = 3, col = "blue") +
+    ggplot2::geom_vline(xintercept = 0, col = "blue") +
+    ggplot2::ggtitle(main)
+}
+```
+
+```{r}
+datasets <- c("Physio", "PlaMet", "LivMet")
+transforms <- c(Raw = "Raw Data", NS = "Normal Scores")
+
+```
+
+```{r eval=FALSE}
+# The *Raw{Data,Signal}.rds files were created using foundr::harmonize
+# with normalize = FALSE option.
+traitrawData <- 
+  dplyr::bind_rows(
+    NS = 
+      dplyr::filter(
+        readRDS("traitData.rds"),
+        .data$dataset %in% datasets),
+    Raw = 
+      foundr:::bind_traits_object(
+        paste0(datasets, "Raw"),
+        "Data"),
+    .id =  "transform")
+saveRDS(traitrawData, "traitrawData.rds")
+traitrawSignal <- 
+  bind_rows(
+    NS = 
+      dplyr::filter(
+        readRDS("traitSignal.rds"),
+        .data$dataset %in% datasets),
+    Raw =
+      foundr:::bind_traits_object(
+        paste0(datasets, "Raw"),
+        "Signal"),
+    .id = "transform")
+saveRDS(traitrawSignal, "traitrawSignal.rds")
+```
+
+```{r}
+traitrawData <- readRDS("traitrawData.rds")
+traitrawSignal <- readRDS("traitrawSignal.rds")
+```
+
+# Skewness and Kurtosis
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    6,
+    shiny::selectInput("transform", "Data transform",
+                       transforms)),
+  shiny::column(
+    6,
+    shiny::selectInput("dataset", "Dataset", datasets)))
+```
+
+```{r}
+traitrawdata <- shiny::reactive({
+  shiny::req(input$dataset)
+  dplyr::filter(
+    traitrawData,
+    .data$dataset == input$dataset)
+})
+```
+
+```{r}
+traitrawsignal <- shiny::reactive({
+  shiny::req(input$dataset)
+  dplyr::filter(
+    traitrawSignal,
+    .data$dataset == input$dataset)
+})
+```
+
+```{r}
+transformer <- shiny::reactive({
+  shiny::req(input$transform)
+  names(transforms)[match(input$transform, transforms)]
+})
+```
+
+```{r}
+traitdata <- shiny::reactive({
+  shiny::req(transformer(), traitrawdata())
+  dplyr::select(
+    dplyr::filter(
+      traitrawdata(),
+      .data$transform == transformer()),
+    -transform)
+})
+```
+
+```{r}
+traitsignal <- shiny::reactive({
+  shiny::req(transformer(), traitrawsignal())
+  dplyr::select(
+    dplyr::filter(
+      traitrawsignal(),
+      .data$transform == transformer()),
+    -transform)
+})
+```
+
+```{r eval = FALSE}
+DT::renderDataTable({
+  DT::datatable(traitsignal())
+})
+```
+
+```{r}
+skplot <- shiny::reactive({
+  shiny::req(traitdata(), traitsignal())
+  skewkurt(
+      traitdata(),
+      traitsignal(),
+      paste(input$dataset, "traits with", input$transform))
+})
+```
+
+```{r}
+plotly::renderPlotly({
+  shiny::req(skplot())
+  
+  if(is.null(skplot()))
+    foundr::plot_null("no moddata2 data")
+  else {
+  plotly::event_register(
+    plotly::ggplotly(print(skplot())),
+    "plotly_click")
+  }
+})
+```
+
+Click on point in above plot to see trait plot ...
+
+```{r}
+pointKey <- shiny::reactive({
+  shiny::req(skplot())
+  point <- plotly::event_data(
+    event = "plotly_click", priority = "event")
+  shiny::req(point) # to avoid error if no point is clicked
+  point$key
+})
+```
+
+```{r}
+traitsolos <- shiny::reactive({
+  shiny::req(traitrawdata(), traitrawsignal(), pointKey())
+  tdata <- 
+    tidyr::unite(
+          traitrawdata(),
+          dataset, dataset, transform)
+  sdata <-
+    tidyr::unite(
+          traitrawsignal(),
+          dataset, dataset, transform)
+  foundr::traitSolos(
+    tdata,
+    sdata,
+    paste(unique(sdata$dataset), pointKey(), sep = ": "))
+})
+```
+
+```{r}
+shiny::renderPlot({
+  if(!shiny::isTruthy(traitsolos())) {
+    print(foundr::plot_null("no trait solo data"))
+  } else {
+  print(foundr::ggplot_traitSolos(traitsolos()))
+  }
+})
+```
+
+... pairs plot (similar to QQ plot) ...
+
+```{r}
+shiny::renderPlot({
+  if(!shiny::isTruthy(traitsolos())) {
+    print(foundr::plot_null("no trait solo data"))
+  } else {
+  print(foundr::ggplot_traitPairs(
+    foundr::traitPairs(traitsolos())))
+  }
+})
+```
+
+... and, if any differ, a table of cell means for Raw Data (Raw) and Normal Scores (NS).
+
+```{r}
+cellmeandiff <- shiny::reactive({
+  dplyr::filter(
+    tidyr::pivot_wider(
+      dplyr::mutate(
+        dplyr::distinct(
+          dplyr::select(
+            traitsolos(),
+            -value),
+          dataset, trait, strain, sex, condition, cellmean),
+        cellmean = signif(.data$cellmean, 4)),
+      names_from = "dataset", values_from = "cellmean"),
+    .data[[paste0(input$dataset, "_Raw")]] !=
+      .data[[paste0(input$dataset, "_NS")]])
+})
+```
+
+```{r}
+DT::renderDataTable({
+  shiny::req(cellmeandiff())
+  if(nrow(cellmeandiff())) {
+    DT::datatable(cellmeandiff())
+  }
+})
+```
