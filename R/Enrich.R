@@ -1,7 +1,7 @@
 EnrichHarmony <- function(dataset, links, annot, ...) {
   filename <- linkpath(dataset, links)
   
-  # Get trait names from 2nd row. 
+  # Get trait names from 2nd row.
   traits <- unlist(read_excel(filename, sheet = 1,
                       skip = 1, n_max = 1, col_names = FALSE)[1,])
   traits <- traits[!is.na(traits)]
@@ -49,6 +49,7 @@ EnrichHarmony <- function(dataset, links, annot, ...) {
   # Area under curve
   auc <- area_under_curve(out)
   
+  
   # These are harmonized columns and their names.
   bind_rows(
     out %>%
@@ -62,5 +63,7 @@ EnrichHarmony <- function(dataset, links, annot, ...) {
       select(strain, sex, animal, condition, trait, value)) %>%
     
     # Make sure animal is character.
-    mutate(animal = as.character(animal))
+    # Add `_18wk` to end of trait names.
+    mutate(animal = as.character(animal),
+           trait = paste(trait, "18wk", sep = "_"))
 }

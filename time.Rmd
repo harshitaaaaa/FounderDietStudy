@@ -1,0 +1,220 @@
+---
+title: "Time Measurements"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+runtime: shiny
+params:
+  echo: no
+resource_files:
+- traitData.rds
+- traitSignal.rds
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+#devtools::install_github("byandell/foundr")
+```
+
+# Traits over time
+
+```{r}
+setwd("~/Documents/Research/attie_alan/FounderDietStudy/")
+```
+
+```{r}
+traitSignal <- readRDS("traitSignal.rds")
+```
+
+```{r}
+datatraits <- 
+  dplyr::filter(
+    dplyr::mutate(
+      dplyr::distinct(
+        traitSignal,
+        .data$dataset, .data$trait),
+      timetrait = c("no", "week", "minute")[
+        1 + grepl("_[0-9]+_", .data$trait) +
+          grepl("_[0-9]+wk", .data$trait)]),
+    .data$timetrait != "no")
+```
+
+```{r}
+traitSignal <- 
+  foundr::unite_datatraits(
+    traitSignal,
+    foundr::unite_datatraits(datatraits),
+    undo = TRUE)
+  
+traitData <- 
+  foundr::unite_datatraits(
+    readRDS("traitData.rds"),
+    foundr::unite_datatraits(datatraits),
+    undo = TRUE)
+```
+
+```{r}
+dtraits <- 
+  foundr::unite_datatraits(
+    dplyr::filter(
+    dplyr::count(
+    dplyr::distinct(
+      foundr::separate_time(
+        datatraits,
+        datatraits,
+        "week"),
+      .data$dataset, .data$trait, .data$week),
+    .data$dataset, .data$trait),
+    n > 1))
+```
+
+```{r}
+print(foundr::ggplot_strain_time(
+    foundr::separate_time(traitData, datatraits, "week"),
+    foundr::separate_time(traitSignal, datatraits, "week"),
+    "Physio: BW", "week", response = "cellmean"))
+```
+
+```{r}
+print(foundr::ggplot_strain_time(
+  foundr::separate_time(traitData, datatraits, "minute"),
+  foundr::separate_time(traitSignal, datatraits, "minute"),
+  "Physio: GTT_glu", "minute", response = "cellmean",
+  facet_strain = TRUE))
+```
+
+```{r}
+print(foundr::ggplot_strain_time(
+  foundr::separate_time(traitData, datatraits, "minute"),
+  foundr::separate_time(traitSignal, datatraits, "minute"),
+  "Physio: cpep_ins_molar_ratio_iAUC", "week", response = "value",
+  facet_strain = TRUE))
+```
+
+
+# Shiny Code
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    3,
+    shiny::selectInput("time", "Time Unit:", c("week", "minute"))),
+  shiny::column(
+    3,
+    shiny::selectInput("trait", "Trait:", NULL)),
+  shiny::column(
+    3,
+    shiny::checkboxInput("facet_strain", "Facet Strain?", FALSE)),
+  shiny::column(
+    3,
+    shiny::selectInput("response", "Response:", c("value", "cellmean", "signal"))))
+```
+
+```{r}
+traits <- shiny::reactive({
+  shiny::req(input$time)
+  foundr::unite_datatraits(
+    dplyr::filter(
+      dplyr::count(
+        dplyr::distinct(
+          foundr::separate_time(
+            datatraits,
+            datatraits,
+            input$time),
+          .data$dataset, .data$trait, .data[[input$time]]),
+        .data$dataset, .data$trait),
+      .data$n > 1))
+})
+```
+
+```{r}
+shiny::observeEvent(
+  input$time,
+  {
+    shiny::updateSelectInput(
+      session, "trait",
+      choices = traits(),
+      selected = traits()[1])
+})
+```
+
+```{r}
+traitTimeData <- shiny::reactive({
+  shiny::req(input$time)
+  foundr::separate_time(traitData, datatraits, input$time)
+})
+```
+
+```{r}
+traitTimeSignal <- shiny::reactive({
+  shiny::req(input$time)
+  foundr::separate_time(traitSignal, datatraits, input$time)
+})
+```
+
+```{r}
+shiny::renderPlot({
+  print(foundr::ggplot_strain_time(
+    traitTimeData(),
+    traitTimeSignal(),
+    input$trait, input$time,
+    response = input$response,
+    facet_strain = input$facet_strain))
+})
+```
+
+```{r}
+knitr::knit_exit()
+```
+
+```{r}
+ggplot_strain_time(PhysioWkData, PhysioWkSignal, "BW", "cellmean")
+```
+
+```{r warning = FALSE}
+ggplot_strain_time(PhysioWkData, PhysioWkSignal, "BW", "cellmean",
+                   facet_strain = TRUE)
+```
+
+
+```{r warning = FALSE}
+ggplot_strain_time(PhysioWkData, PhysioWkSignal, "percent_fat", "cellmean",
+                   facet_strain = FALSE)
+```
+
+```{r warning = FALSE}
+ggplot_strain_time(PhysioWkData, PhysioWkSignal, "percent_fat", "cellmean",
+                   facet_strain = TRUE)
+```
+
+# GTT Traits over weeks
+
+```{r}
+PhysioGTTData <- separate_GTT(PhysioData, mintraits)
+PhysioGTTSignal <- separate_GTT(PhysioSignal, mintraits)
+```
+
+```{r warning = FALSE, message = FALSE}
+ggplot_strain_time(PhysioGTTData %>% filter(week == 14),
+                   PhysioGTTSignal %>% filter(week == 14),
+                   "GTT_glu", "cellmean", "minute")
+```
+
+```{r warning = FALSE, message = FALSE}
+ggplot_strain_time(PhysioGTTData %>% filter(week == 14),
+                   PhysioGTTSignal %>% filter(week == 14),
+                   "GTT_glu", "cellmean", "minute",
+                   facet_strain = TRUE)
+```
+
+```{r warning = FALSE, message = FALSE}
+ggplot_strain_time(PhysioGTTData %>% filter(week == 18),
+                   PhysioGTTSignal %>% filter(week == 18),
+                   "GTT_glu", "cellmean", "minute",
+                   facet_strain = TRUE)
+```
+
+

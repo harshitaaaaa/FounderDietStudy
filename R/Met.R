@@ -1,22 +1,47 @@
-MetHarmony <- function(dataset, links, skiprows = 4, skipcols = 4, ...) {
+#' Read Metabolite File for Harmonization
+#'
+#' There are  minor differences among metabolite files.
+#' To harmonize, we assume the following:
+#'    Some number of rows (3-4) at top of file are skipped
+#'    Columns from “compound” to “data_type” precede mouse data
+#'    Mouse ID always begins with FFF-nn with “FFF” = founder, “nn” = animal
+#'    (the rest of Mouse ID seems to change from file to file)
+
+#' @param dataset name of dataset
+#' @param links dataframe of links to data files 
+#' @param annot annotation data frame
+#' @param skiprows number of rows to skip
+#' @param ... ignore
+#'
+#' @return data frame with columns for strain, sex, animal, condition, trait, value
+#' @export
+#'
+MetHarmony <- function(dataset, links, annot, skiprows = 4, ...) {
   filename <- linkpath(dataset, links)
+
+  # Join with `annot` to get strain, number, sex, diet
+  dplyr::left_join(
+    
+    # Data are in sheet 1 starting on line 5.
+    read_excel(filename, sheet = 1, skip = skiprows) %>%
+    
+      # Pivot traits, which begin in column 5.
+      pivot_longer(-(compound:data_type), names_to = "mouse_id", values_to = "value") %>%
   
-  # Data are in sheet 1 starting on line 5.
-  read_excel(filename, sheet = 1, skip = skiprows) %>%
+      # Decode `strain`, `animal`, `sex` and `condition` from `mousecode`.
+      mutate(mouse_id = str_remove(mouse_id, "_.*")),
     
-    # Pivot traits, which begin in column 5.
-    pivot_longer(-seq_len(skipcols), names_to = "mousecode", values_to = "value") %>%
+    # Annotation
+    annot,
+    by = "mouse_id") %>%
     
-    # Decode `strain`, `animal`, `sex` and `condition` from `mousecode`.
-    mutate(
-      strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
-      animal = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
-      sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
-      condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
-    
-    # Rename `compound` as `trait`.
-    rename(trait = "compound") %>%
-    
+    # Rename `compound` as `trait`, number as `animal`
+    rename(
+      trait = "compound",
+      animal = "number",
+      condition = "diet") %>%
+    mutate(animal = as.character(animal)) %>%
+
     # These are harmonized columns and their names.
     select(strain, sex, animal, condition, trait, value)
 }

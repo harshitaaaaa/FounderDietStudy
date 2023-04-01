@@ -29,25 +29,7 @@ for(filename in list.files("R", full.names = TRUE)) {
 links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
 ```
 
-## Physio: Physiological traits
-
-```{r}
-harmonize("Physio", links, PhysioHarmony)
-```
-
-## PlaMet: Plasma metabolites
-
-```{r warning = FALSE}
-harmonize("PlaMet", links, MetHarmony, skiprows = 4, skipcols = 4)
-```
-
-## LivMet: Liver metabolites
-
-```{r warning = FALSE}
-harmonize("LivMet", links, MetHarmony, skiprows = 3, skipcols = 5)
-```
-
-## LivRna: Liver mRNA expression
+## Annotation
 
 The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`. Needed for `LivRna`.
 
@@ -57,6 +39,32 @@ excel_sheets(annotfile)
 annot <- read_excel(annotfile) %>%
   mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
 ```
+
+## Physio: Physiological traits
+
+```{r}
+harmonize("Physio", links, PhysioHarmony)
+```
+
+## PlaMet: Plasma metabolites
+
+```{r warning = FALSE}
+harmonize("PlaMet0", links, MetHarmony, annot, skiprows = 4)
+```
+
+## PlaMet120: Plasma metabolites at 120 minutes
+
+```{r warning = FALSE}
+harmonize("PlaMet120", links, MetHarmony, annot, skiprows = 3)
+```
+
+## LivMet: Liver metabolites
+
+```{r warning = FALSE}
+harmonize("LivMet", links, MetHarmony, annot, skiprows = 3)
+```
+
+## LivRna: Liver mRNA expression
 
 There is a separate liver annotation file, which relates `ENTREZID` to `SYMBOL`.
 
@@ -89,6 +97,6 @@ harmonize("Module", links, foundr::moduleHarmony,
 ```
 
 ```{r}
-bind_traits(c("Physio","PlaMet","LivMet","LivRna","Module","Enrich"))
+bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Module","Enrich"))
 ```
 
