@@ -6,6 +6,7 @@
 #'    Columns from “compound” to “data_type” precede mouse data
 #'    Mouse ID always begins with FFF-nn with “FFF” = founder, “nn” = animal
 #'    (the rest of Mouse ID seems to change from file to file)
+#'    Trait names with " (n)" (n = 1,2,3) at the end have this removed.
 
 #' @param dataset name of dataset
 #' @param links dataframe of links to data files 
@@ -40,7 +41,12 @@ MetHarmony <- function(dataset, links, annot, skiprows = 4, ...) {
       trait = "compound",
       animal = "number",
       condition = "diet") %>%
-    mutate(animal = as.character(animal)) %>%
+    mutate(
+      # Make sure animal is character.
+      animal = as.character(animal)) %>%
+#      # Remove trailing (1) appearing on some trait names.
+#      trait = #str_to_title(
+#        str_remove(trait, " \\([0-9]\\)$"))) %>%
 
     # These are harmonized columns and their names.
     select(strain, sex, animal, condition, trait, value)

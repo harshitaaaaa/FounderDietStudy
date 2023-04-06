@@ -56,15 +56,12 @@ datadir <- "."
 ```
 
 ```{r}
-datasets <- c("LivMet","PlaMet")
+datasets <- c("LivMet","PlaMet0","PlaMet120")
 responses <- c("value","cellmean","signal","rest","noise")
 ```
 
 ```{r}
 traitModule <- readRDS(file.path(datadir, "traitModule.rds"))
-```
-
-```{r}
 traitData <- 
   dplyr::filter(
       readRDS(file.path(datadir, "traitData.rds")),

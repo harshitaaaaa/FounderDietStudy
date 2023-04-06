@@ -2,7 +2,7 @@ shortname,address,longname
 google,https://drive.google.com/drive/u/1/folders/1v2xyz0s0ELYkEwMdEOMjAvLVWJA1OkGG,
 annot,mouse annotations for founder diet study.xlsx,
 Physio,Final raw and computed in vivo founder data for Mark for correlations.xlsx,Physiological traits
-PlaMet,RawData/Founder diet data/Plasma metabolite abundance/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 0min
+PlaMet0,RawData/Founder diet data/Plasma metabolite abundance/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 0min
 PlaMet120,RawData/Founder diet data/Plasma metabolite abundance/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 120min 
 LivRna,normalizedcount.csv,Liver gene expression
 liver_annot,varianceStabilizingTransformation/annotation2.csv,

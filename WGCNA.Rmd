@@ -1,7 +1,7 @@
 ---
 title: "WGCNA"
 author: "Brian Yandell"
-date: "2023-03-12"
+date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
@@ -37,55 +37,53 @@ datadir <- "."
 
 # WGCNA 
 
-Individual values
+Read or save (RDS) module information for each dataset.
 
 ```{r}
-if(file.exists(filename <- file.path(datadir, "LivMetModule.rds"))) {
-  LivMetModule <- readRDS(filename)
-} else {
-  LivMetData <- readRDS(file.path(datadir, "LivMetData.rds"))
-  LivMetSignal <- readRDS(file.path(datadir, "LivMetSignal.rds"))
-  LivMetModule <- modulr::listof_wgcnaModules(LivMetData, LivMetSignal)
-  saveRDS(LivMetModule, filename)
-}
+datasets <- c("LivMet","PlaMet0","PlaMet120","LivRna")
 ```
 
 ```{r}
-if(file.exists(filename <- file.path(datadir, "PlaMetModule.rds"))) {
-  PlaMetModule <- readRDS(filename)
-} else {
-  PlaMetData <- readRDS(file.path(datadir, "PlaMetData.rds"))
-  PlaMetSignal <- readRDS(file.path(datadir, "PlaMetSignal.rds"))
-  PlaMetModule <- modulr::listof_wgcnaModules(PlaMetData, PlaMetSignal)
-  saveRDS(PlaMetModule, filename)
+for(mod in datasets) {
+  modname <- paste0(mod, "Module")
+  if(file.exists(
+    filename <- file.path(datadir, paste0(mod, "Module.rds")))) {
+    assign(modname, readRDS(filename))
+  } else {
+    # Create list of WGCNA modules.
+    assign(modname, 
+      modulr::listof_wgcnaModules(
+        readRDS(file.path(datadir, paste0(mod, "Data", ".rds"))),
+        readRDS(file.path(datadir, paste0(mod, "Signal", ".rds")))))
+    
+    # Save listof_wgcnaModules object.
+    saveRDS(
+      get(modname),
+      filename)
+  }
 }
 ```
 
-```{r warning = FALSE, message = FALSE}
-if(file.exists(filename <- file.path(datadir, "LivRnaModule.rds"))) {
-  LivRnaModule <- readRDS(filename)
-} else {
-  LivRnaData <- readRDS(file.path(datadir, "LivRnaData.rds"))
-  LivRnaSignal <- readRDS(file.path(datadir, "LivRnaSignal.rds"))
-  LivRnaModule <- modulr::listof_wgcnaModules(LivRnaData, LivRnaSignal)
-  saveRDS(LivRnaModule, filename)
-}
-```
+Create `traitModule` object as list of dataset module objects.
 
 ```{r}
 if(file.exists(filename <- file.path(datadir, "traitModule.rds"))) {
   traitModule <- readRDS(filename)
 } else {
-  traitModule <- list(
-    LivMet = readRDS(file.path(datadir, "LivMetModule.rds")),
-    PlaMet = readRDS(file.path(datadir, "PlaMetModule.rds")),
-    LivRna = readRDS(file.path(datadir, "LivRnaModule.rds")))
+  traitModule <- list()
+  for(mod in datasets) {
+    traitModule[[mod]] <- 
+      readRDS(
+        file.path(
+          datadir,
+          paste0(mod, "Module.rds")))
+  }
   saveRDS(traitModule, filename)
 }
 ```
 
 ```{r}
-summary(LivMetModule, "signal")
+summary(traitModule[["LivMet"]], "signal")
 ```
 
 # Module Harmony
@@ -219,7 +217,7 @@ foundr::ggplot_traitSolos(GYSolo)
 ## Plots
 
 ```{r}
-modband <- foundr::module_band(LivMetModule, "signal")
+modband <- foundr::module_band(traitModule$LivMet, "signal")
 ```
 
 ```{r}
@@ -227,18 +225,18 @@ foundr::ggplot_module_band(modband)
 ```
 
 ```{r warning = FALSE, message = FALSE}
-foundr::ggplot_listof_wgcnaModules(LivMetModule)
+foundr::ggplot_listof_wgcnaModules(traitModule$LivMet)
 ```
 Standard plot.
 
-```{r}
-plot(LivMetModule$value)
+```{r eval=FALSE}
+plot(traitModule$LivMet$value)
 ```
 
 # Module Comparisons
 
 ```{r}
-mods <- foundr::module_kMEs(LivMetModule)
+mods <- foundr::module_kMEs(traitModule$LivMet)
 ```
 
 ```{r}
@@ -266,7 +264,7 @@ plotly::ggplotly(ggplot2::autoplot(mods, "value", "cellmean", abskME = TRUE,
 # Eigentraits
 
 ```{r}
-eigens <- foundr::eigen_cor(LivMetModule)
+eigens <- foundr::eigen_cor(traitModule$LivMet)
 ```
 
 ```{r}
@@ -282,7 +280,8 @@ The sign of correlation of modules could provide adjustment to direction in kME 
 # Compare Datasets
 
 ```{r}
-dmods <- list(LivMet = LivMetModule, PlaMet = PlaMetModule)
+dmods <- list(LivMet = traitModule$LivMet,
+              PlaMet0 = traitModule$PlaMet0)
 response <- "value"
 ```
 
@@ -296,18 +295,18 @@ metmods <- foundr::module_kMEs(valueMet)
 
 ```{r}
 plotly::ggplotly(
-  ggplot2::autoplot(metmods, "LivMet", "PlaMet"))
+  ggplot2::autoplot(metmods, "LivMet", "PlaMet0"))
 ```
 
 ```{r}
 traitData <- 
   dplyr::filter(
       readRDS(file.path(datadir, "traitData.rds")),
-      dataset %in% c("LivMet","PlaMet"))
+      dataset %in% c("LivMet","PlaMet0"))
 traitSignal <-
     dplyr::filter(
       readRDS(file.path(datadir, "traitSignal.rds")),
-      dataset %in% c("LivMet","PlaMet"))
+      dataset %in% c("LivMet","PlaMet0"))
 ```
 
 ```{r}
@@ -335,6 +334,6 @@ eigenMet <- foundr::eigen_cor(valueMet)
 ```
 
 ```{r}
-ggplot2::autoplot(eigenMet, "LivMet", "PlaMet")
+ggplot2::autoplot(eigenMet, "LivMet", "PlaMet0")
 ```
 
