@@ -1,0 +1,271 @@
+---
+title: "Metabolites"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+runtime: shiny
+params:
+  echo: no
+resource_files:
+- traitData.rds
+- traitSignal.rds
+- traitStats.rds
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(foundr)
+```
+
+# Trait names across metabolites
+
+Strategy is to try to try to match up names when difference is only about capitalization. Then we look at 0-120 pairs for PlaMet to see how they are associated. In particular, consider the model
+
+<center>
+```
+PlaMet120 ~ PlaMet0 + strain * sex * diet
+PlaMet120 ~ PlaMet0 + signal + rest
+```
+</center>
+
+If PlaMet0 explains the signal at least, and ideally the rest,
+then all the information about factor effects is there at the beginning and there are no GTT adjustments. If PlaMet0 remains significant after adjusting for signal and rest, then there is additional information in PlaMet0 beyond the experimental design.
+
+Coding will involve adjustment to strainstats to allow for covariate.
+
+Also consider what to do with LivMet. See stuff later in this document.
+
+Goal also is to have beginning of document static and rest dynamic.
+
+
+```{r}
+datasets <- c("PlaMet0", "PlaMet120")
+```
+
+```{r}
+traitSignal <- readRDS("traitSignal.rds") %>%
+  filter(dataset %in% datasets)
+```
+
+```{r}
+trnames <- traitSignal %>%
+  mutate(trait = as.character(trait)) %>%
+  count(dataset, trait) %>%
+  pivot_wider(names_from = "dataset", values_from = "n") %>%
+  filter(!is.na(PlaMet0), !is.na(PlaMet120)) %>%
+  arrange(trait)
+```
+
+```{r}
+traits <- trnames$trait
+```
+
+```{r}
+traitData <- readRDS("traitData.rds") %>%
+  filter(dataset %in% datasets,
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+traitSignal <- readRDS("traitSignal.rds") %>%
+  filter(dataset %in% datasets,
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+traitStats <- readRDS("traitStats.rds") %>%
+  filter(dataset %in% datasets,
+         trait %in% traits) %>%
+  mutate(trait = factor(trait, traits))
+```
+
+# Correlation of values
+
+```{r}
+cortrait <- function(object, datasets, values = "value") {
+  out <- dplyr::ungroup(
+    dplyr::summarize(
+      dplyr::group_by(
+        tidyr::pivot_wider(
+          object,
+          names_from = "dataset", values_from = values),
+        trait),
+      value = stats::cor(
+        .data[[datasets[1]]],
+        .data[[datasets[2]]],
+        use = "pair"),
+      .groups = "drop"))
+  
+  names(out)[match("value", names(out))] <- values
+  out
+}
+```
+
+```{r}
+cors <- bind_cols(
+  # Correlation of values
+  traitData %>%
+    cortrait(datasets),
+  
+  # Correlation of cellmean
+  traitSignal %>%
+    select(-signal) %>%
+    cortrait(datasets, "cellmean") %>%
+    select(-trait),
+  
+  # Correlation of signal
+  traitSignal %>%
+    select(-cellmean) %>%
+    cortrait(datasets, "signal") %>%
+    select(-trait),
+  
+  # Correlation of rest
+  traitSignal %>%
+    mutate(rest = cellmean - signal) %>%
+    select(-signal, -cellmean) %>%
+    cortrait(datasets, "rest") %>%
+    select(-trait),
+
+  # Correlation of noise
+  left_join(
+    traitData,
+    traitSignal,
+    by = c("dataset", "strain", "sex", "condition", "trait")) %>%
+    mutate(noise = value - cellmean) %>%
+    select(-signal, -cellmean, -value) %>%
+    cortrait(datasets, "noise") %>%
+    select(-trait))
+```
+
+```{r}
+corstats <- 
+  inner_join(
+    traitStats %>% filter(dataset == "PlaMet0", term == "signal"),
+    cors,
+    by = "trait")
+```
+
+```{r}
+CB_colors <- RColorBrewer::brewer.pal(n = 3, name = "Dark2")
+invisible(c("#1B9E77", "#D95F02", "#7570B3"))
+```
+
+```{r}
+plotly::renderPlotly({
+ggplot(
+  cors %>%
+    pivot_longer(cellmean:noise,
+                 names_to = "response", values_to = "cors") %>%
+    mutate(response = factor(response, unique(response)))) +
+  aes(value, cors) +
+  facet_wrap(~ response) +
+  geom_point(aes(key = trait), shape = 1, col = CB_colors[3]) +
+  geom_smooth(method = "lm", se = FALSE, formula = "y~x",
+                col = CB_colors[2]) +
+  geom_abline(slope = 1, intercept = 0, col = CB_colors[1], linewidth = 1) +
+  ylab("correlation of other") +
+  xlab("correlation of values")
+})
+```
+
+# Correlation of Stats
+
+```{r}
+stats <- traitStats %>%
+   mutate(p.value = -log10(p.value)) %>%
+   pivot_longer(SD:p.value, names_to = "stats", values_to = "value") %>%
+   pivot_wider(names_from = "dataset", values_from = "value")
+```
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    6,
+    selectInput("type", "Type:", c("p.value","SD"))),
+  shiny::column(
+    6,
+    selectInput("model", "Model:", c("parts","signal","strain","condition"))
+  )
+)
+```
+
+```{r}
+model_parts <- shiny::reactive({
+  shiny::req(input$model)
+  switch(
+    input$model,
+    parts = c("cellmean", "signal", "rest"),
+    signal = c("signal", "strain_condition", "strain_sex_condition"),
+    strain = c("strain", "sex", "strain_sex"),
+    condition = c("condition", "sex_condition"))
+})
+```
+
+```{r}
+plot_stats <- function(stats, terms = unique(stats$term),
+                       type = c("p.value","SD"),
+                       datasets = c("PlaMet0", "PlaMet120")) {
+  type <- match.arg(type)
+  
+  p <- ggplot(
+    stats %>%
+      filter(stats == type,
+             term %in% terms) %>%
+      mutate(term = factor(term, terms))) +
+    facet_grid(stats ~ term, scale = "free") +
+    geom_point(aes(key = trait), shape = 1, col = CB_colors[3]) +
+    geom_smooth(method = "lm", se = FALSE, formula = "y~x",
+                col = CB_colors[2]) +
+    geom_abline(slope = 1, intercept = 0, col = CB_colors[1],
+                linewidth = 1) +
+    ggtitle(
+      paste(ifelse(type == "p.value", "-log10", ""),
+            type, "for",
+            paste(rev(datasets), collapse = " ON ")))
+  
+  switch(type,
+    p.value = {
+      p <- p + aes(
+        -log10(.data[[datasets[1]]]),
+        -log10(.data[[datasets[2]]]))
+    },
+    SD = {
+      p <- p + aes(
+        .data[[datasets[1]]],
+        .data[[datasets[2]]])
+  })
+  p +
+    xlab(datasets[1]) +
+    ylab(datasets[2])
+}
+```
+
+
+```{r}
+plotly::renderPlotly({
+  shiny::req(model_parts(), input$type)
+  plot_stats(stats, model_parts(), input$type)
+})
+```
+
+# Correlation of Correlation to PlaMet0 signal.
+
+```{r}
+responses <- c("value", "cellmean", "signal", "rest", "noise")
+```
+
+```{r}
+shiny::selectInput("response", "Response", responses)
+```
+
+```{r}
+plotly::renderPlotly({
+ggplot(corstats) +
+  aes(-log10(.data$p.value), .data[[input$response]]) +
+  geom_point(aes(key = .data$trait), shape = 1, col = CB_colors[3]) +
+  geom_smooth(method = "lm", se = FALSE, formula = "y~x",
+                col = CB_colors[2]) +
+    ggtitle(paste("p.value of signal vs correlation of", input$response))
+})
+```
+

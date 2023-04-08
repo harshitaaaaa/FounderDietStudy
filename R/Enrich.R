@@ -49,9 +49,8 @@ EnrichHarmony <- function(dataset, links, annot, ...) {
   # Area under curve
   auc <- area_under_curve(out)
   
-  
   # These are harmonized columns and their names.
-  bind_rows(
+  out <- bind_rows(
     out %>%
       
       # Unite trait and minutes to form new trait by minutes.

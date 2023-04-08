@@ -6,100 +6,250 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 ```{r}
 library(tidyverse)
 library(foundr)
 ```
+
+# Trait names across metabolites
+
+Strategy is to try to try to match up names when difference is only about capitalization. Then we look at 0-120 pairs for PlaMet to see how they are associated. In particular, consider the model
+
+<center>
+```
+PlaMet120 ~ PlaMet0 + strain * sex * diet
+PlaMet120 ~ PlaMet0 + signal + rest
+```
+<\center>
+
+If PlaMet0 explains the signal at least, and ideally the rest,
+then all the information about factor effects is there at the beginning and there are no GTT adjustments. If PlaMet0 remains significant after adjusting for signal and rest, then there is additional information in PlaMet0 beyond the experimental design.
+
+Coding will involve adjustment to strainstats to allow for covariate.
+
+Also consider what to do with LivMet. See stuff later in this document.
+
+Goal also is to have beginning of document static and rest dynamic.
+
+
 ```{r}
 traitSignal <- readRDS("traitSignal.rds") %>%
-  filter(dataset %in% c("LivMet", "PlaMet"))
+  filter(dataset %in% c("LivMet", "PlaMet0", "PlaMet120"))
+```
+
+```{r}
+trnames <- traitSignal %>%
+  mutate(Trait = as.character(trait),
+         trait = str_to_title(Trait)) %>%
+  select(dataset, trait, Trait) %>%
+  distinct(dataset, trait, Trait) %>%
+   group_by(dataset, trait) %>%
+   summarize(Trait = paste(Trait, collapse = "; "),
+             trait = trait[1],
+             .groups = "drop") %>%
+   ungroup() %>%
+   select(dataset, trait, Trait) %>%
+   arrange(trait)
 ```
 
 
 ```{r}
-traits <- (traitSignal %>%
-  count(dataset, trait) %>%
-  pivot_wider(names_from = "dataset", values_from = "n", values_fill = 0) %>%
-  filter(LivMet > 0, PlaMet > 0))$trait
+traitct <- traitSignal %>%
+   mutate(trait = str_to_title(trait)) %>%
+   count(dataset, trait) %>%
+   pivot_wider(names_from = "dataset", values_from = "n", values_fill = 0) %>%
+   mutate(status = ifelse(LivMet > 0 & PlaMet0 > 0 & PlaMet120 > 0,
+                          "all", NA),
+          status = ifelse(is.na(status) & (PlaMet120 > 0 & PlaMet0 > 0),
+                          "PlaMets", status),
+          status = ifelse(is.na(status) & (PlaMet120 > 0 & PlaMet0 == 0),
+                          "PlaMet120", status),
+          status = ifelse(is.na(status) & (PlaMet0 > 0 & PlaMet120 == 0),
+                          "PlaMet0", status))
+```
+
+```{r}
+table(traitct$status)
+```
+
+  Cytidine              192
+2 N-Acetylneuraminate   192
+3 Quinate               192
+
+```{r}
+LivMetData <- readRDS("LivMetData.rds") %>%
+  filter(tolower(trait) %in% c("cytidine", "quinate", "n-acetylneuraminate"))
+```
+
+```{r}
+traitall <- 
+  traitct %>%
+    filter(status %in% c("PlaMets","all")) %>%
+    select(status, trait) %>%
+    arrange(trait)
+```
+
+```{r}
+traitpla <- 
+  traitct %>%
+    filter(status %in% c("PlaMet0","PlaMet120")) %>%
+    select(status, trait) %>%
+    arrange(trait)
+```
+
+```{r}
+traitjoin <- function(traitpla, trnames, dataname) {
+  trnames <- trnames %>%
+    filter(dataset == dataname) %>%
+    select(-dataset)
+  names(trnames)[match("Trait", names(trnames))] <-dataname
+  
+  arrange(
+    select(
+    left_join(
+    traitpla,
+    trnames,
+    by = "trait"),
+    status, everything()),
+    trait)
+}
+```
+
+```{r}
+traitpla <- 
+  traitjoin(
+    traitjoin(
+      traitjoin(
+        traitpla,
+        trnames,
+        "PlaMet0"),
+      trnames,
+      "PlaMet120"),
+    trnames,
+    "LivMet")    
+```
+
+Following data frame has 0 rows since trait names forced into Title case (stringr::str_to_title() in R/Met.R).
+
+```{r}
+traitall <- 
+  traitjoin(
+    traitjoin(
+      traitjoin(
+        traitall,
+        trnames,
+        "PlaMet0"),
+      trnames,
+      "PlaMet120"),
+    trnames,
+    "LivMet") %>%
+  filter(!(PlaMet0 == PlaMet120 & LivMet == PlaMet0))
+```
+
+```{r}
+traitall <- bind_rows(
+    traitall,
+    traitpla)
+```
+
+```{r eval = FALSE}
+write_csv(
+  traitall,
+  "PlaMetNames.csv"
+)
+```
+
+# Compare two datasets
+
+```{r}
+datasets <- c("PlaMet0", "LivMet")
+```
+
+```{r}
+traits <- 
+  (traitct %>%
+     filter(.data[[datasets[1]]] > 0,
+            .data[[datasets[2]]] > 0))$trait
 ```
 
 ```{r}
 traitData <- readRDS("traitData.rds") %>%
-  filter(dataset %in% c("LivMet", "PlaMet"),
+  filter(dataset %in% datasets,
          trait %in% traits) %>%
   mutate(trait = factor(trait, traits))
 traitSignal <- readRDS("traitSignal.rds") %>%
-  filter(dataset %in% c("LivMet", "PlaMet"),
+  filter(dataset %in% datasets,
          trait %in% traits) %>%
   mutate(trait = factor(trait, traits))
 traitStats <- readRDS("traitStats.rds") %>%
-  filter(dataset %in% c("LivMet", "PlaMet"),
+  filter(dataset %in% datasets,
          trait %in% traits) %>%
   mutate(trait = factor(trait, traits))
+```
+
+```{r}
+traitJoin <-
+  left_join(
+    traitData,
+    traitSignal,
+    by = c("dataset", "strain", "sex", "condition", "trait"))
+
 ```
 
 # Correlation of values
 
 ```{r}
+cortrait <- function(object, datasets) {
+  dplyr::ungroup(
+    dplyr::summarize(
+      dplyr::group_by(
+        tidyr::pivot_wider(
+          object,
+          names_from = "dataset", values_from = "value"),
+        trait),
+      value = stats::cor(
+        .data[[datasets[1]]],
+        .data[[datasets[2]]],
+        use = "pair"),
+      .groups = "drop"))
+}
+```
+
+```{r}
 cors <- bind_cols(
-  # Correlation of individual
+  # Correlation of values
   traitData %>%
-    pivot_wider(names_from = "dataset", values_from = "value") %>%
-    group_by(trait) %>%
-    summarize(
-      individual = cor(PlaMet, LivMet, use = "pair"),
-      .groups = "drop") %>%
-    ungroup(),
+    cortrait(datasets),
+  
   # Correlation of cellmean
   traitSignal %>%
     select(-signal) %>%
-    pivot_wider(names_from = "dataset", values_from = "cellmean") %>%
-    group_by(trait) %>%
-    summarize(
-      cellmean = cor(PlaMet, LivMet, use = "pair"),
-      .groups = "drop") %>%
-    ungroup() %>%
+    rename(value = "cellmean") %>%
+    cortrait(datasets) %>%
     select(-trait),
+  
   # Correlation of signal
   traitSignal %>%
     select(-cellmean) %>%
-    pivot_wider(names_from = "dataset", values_from = "signal") %>%
-    group_by(trait) %>%
-    summarize(
-      signal = cor(PlaMet, LivMet, use = "pair"),
-      .groups = "drop") %>%
-    ungroup() %>%
+    rename(value = "signal") %>%
+    cortrait(datasets) %>%
     select(-trait),
-  # Correlation of individual signal
-  left_join(
-    traitData,
-    traitSignal,
-    by = c("dataset", "strain", "sex", "condition", "trait")) %>%
-    mutate(value = value + signal - cellmean) %>%
+  
+  # Correlation of rest
+  traitSignal %>%
+    mutate(value = cellmean - signal) %>%
     select(-signal, -cellmean) %>%
-    pivot_wider(names_from = "dataset", values_from = "value") %>%
-    group_by(trait) %>%
-    summarize(
-      ind_signal = cor(PlaMet, LivMet, use = "pair"),
-      .groups = "drop") %>%
-    ungroup() %>%
+    cortrait(datasets) %>%
     select(-trait),
+
   # Correlation of individual
-  left_join(
-    traitData,
-    traitSignal,
-    by = c("dataset", "strain", "sex", "condition", "trait")) %>%
+  traitJoin %>%
     mutate(value = value - cellmean) %>%
     select(-signal, -cellmean) %>%
-    pivot_wider(names_from = "dataset", values_from = "value") %>%
-    group_by(trait) %>%
-    summarize(
-      noise = cor(PlaMet, LivMet, use = "pair"),
-      .groups = "drop") %>%
-    ungroup() %>%
+    cortrait(datasets) %>%
     select(-trait))
 ```
 
