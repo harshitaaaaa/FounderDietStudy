@@ -36,12 +36,22 @@ dtraits <- foundr::timetraits(traitSignal, "week")
 
 ```{r}
 traitTime <- foundr::strain_time(traitData, traitSignal,
+                           c("Physio: BW", "Physio: BL"),
+                           "cellmean", "week")
+```
+
+```{r}
+traitTime <- foundr::strain_time(traitData, traitSignal,
                            "Physio: BW",
                            "cellmean", "week")
 ```
 
 ```{r}
 print(foundr::ggplot_strain_time(traitTime))
+```
+
+```{r}
+print(foundr::ggplot_strain_time(traitTime, facet_strain = TRUE))
 ```
 
 ```{r}

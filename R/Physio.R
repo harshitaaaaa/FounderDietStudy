@@ -2,7 +2,7 @@ PhysioHarmony <- function(dataset, links, ...) {
   filename <- linkpath(dataset, links)
   
   # Data are in sheet 2 starting on line 1
-  read_excel(filename, sheet = 2) %>%
+  out <- read_excel(filename, sheet = 2) %>%
     
     # Traits begin in column 5
     pivot_longer(-(1:4), names_to = "trait", values_to = "value") %>%
@@ -18,11 +18,6 @@ PhysioHarmony <- function(dataset, links, ...) {
     
     # These are harmonized columns and their names.
     select(strain, sex, animal, condition, trait, value)
-}
-
-PhysioGTTHarmony <- function(dataset, links, ...) {
-  # Compute GTT AUC for shucks.
-  out <- PhysioHarmony <- function(dataset, links, ...)
   
   # Add GTT area under curve traits
   GTT <- out %>%

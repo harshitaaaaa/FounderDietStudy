@@ -6,7 +6,7 @@ output: html_document
 params:
   dataset:
     label: "Measurement Set"
-    value: plasma
+    value: PlaMet0
     input: select
     choices: [physio, plasma, liver]
   traits:
@@ -23,6 +23,8 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       comment = "", fig.height = 7, fig.width = 7)
 ```
 
+**NB: This document is out of date.**
+
 ```{r}
 library(tidyverse)
 library(readxl)
@@ -38,7 +40,7 @@ traitData <- readRDS("plasmaData.rds")
 
 ```{r}
 dat <- traitData %>% filter(trait == trait[1])
-datb <- broomit(dat)
+datb <- strainstats(dat)
 ```
 
 ```{r}
@@ -59,15 +61,14 @@ coef(fit)[c("sexM", "conditionHF_LC", "sexM:conditionHF_LC")]
 # Plotly of traits
 
 ```{r}
-meas <- readRDS("traits.rds") %>%
-  filter(datatype %in% params$dataset)
-traitPvalue <- readRDS("traitPvalue.rds") %>%
-  filter(datatype %in% params$dataset) %>%
-  arrange(p_sex_diet)
+meas <- readRDS("traitData.rds") %>%
+  filter(dataset %in% params$dataset)
+traitStats <- readRDS("traitStats.rds") %>%
+  filter(dataset %in% params$dataset)
 ```
 
 ```{r}
-traits <- traitPvalue$trait[seq_len(as.integer(params$traits))]
+traits <- unique(traitStats$trait)[seq_len(as.integer(params$traits))]
 meas <- meas %>% 
   filter(trait %in% traits)
 ```
@@ -75,8 +76,7 @@ meas <- meas %>%
 Here we pick out 6 compounds with the lowest absolute value and compares sex, diet and strain.
 
 ```{r}
-strainplot(meas %>%
-         unite(sex_diet, sex, diet))
+plot(traitSolos(meas))
 ```
 
 ```{r warnings = FALSE}
@@ -208,28 +208,28 @@ rr <- resid(fitred)
 ### p-value exploration
 
 ```{r}
-traitPvalue <- readRDS("traitPvalue.rds")
+traitStats <- readRDS("traitStats.rds")
 ```
 
 ```{r}
 logpval <- function(x) pmin(5, -log10(x))
-ggplot(traitPvalue %>% arrange(p_signal)) +
+ggplot(traitStats %>% arrange(p_signal)) +
   aes(logpval(p_diet), logpval(p_sex_diet), col = logpval(p_signal)) +
   geom_point(alpha = 0.75, shape = 21) +
   geom_smooth() +
-  facet_wrap(~ datatype, scales = "free") +
+  facet_wrap(~ dataset, scales = "free") +
   scale_colour_gradientn(colours=rainbow(4))
 ```
 
 ```{r}
-pvals <- traitPvalue %>%
+pvals <- traitStats %>%
   select(-rawSD) %>%
-  pivot_longer(-(datatype:trait), values_to = "pvalue", names_to = "term")
+  pivot_longer(-(dataset:trait), values_to = "pvalue", names_to = "term")
 ```
 
 ```{r}
 ggplot(pvals) +
-  aes(pvalue, col = datatype) +
+  aes(pvalue, col = dataset) +
   geom_density() +
   facet_grid(. ~ term)
 ```
@@ -243,7 +243,7 @@ gtt <- colnames(cors)[grep("GTT", colnames(cors))]
 ```
 
 ```{r}
-physiosum <- (traitPvalue %>% filter(datatype == "physio"))
+physiosum <- (traitStats %>% filter(dataset == "physio"))
 ```
 
 ## Body Weight (BW)
@@ -253,7 +253,7 @@ bwsum <- physiosum %>%
   filter(trait %in% bw, grepl("wk$", trait)) %>%
   mutate(trait = as.numeric(str_remove(str_remove(trait, "^BW_"), "wk$"))) %>%
   rename(week = "trait") %>%
-  select(-datatype, -rawSD, -strain.sex) %>%
+  select(-dataset, -rawSD, -strain.sex) %>%
   pivot_longer(-week, names_to = "term", values_to = "pvalue") %>%
   mutate(pvalue = -log10(pvalue)) %>%
   arrange(term, week)
@@ -288,7 +288,7 @@ kcsum <- physiosum %>%
   filter(trait %in% consumed, grepl("^kcal_", trait)) %>%
   mutate(trait = as.numeric(str_remove(str_remove(trait, "^kcal_consumed_"), "wk$"))) %>%
   rename(week = "trait") %>%
-  select(-datatype, -rawSD, -strain.sex) %>%
+  select(-dataset, -rawSD, -strain.sex) %>%
   pivot_longer(-week, names_to = "term", values_to = "pvalue") %>%
   mutate(pvalue = -log10(pvalue)) %>%
   arrange(term, week)
@@ -326,7 +326,7 @@ gttsum <- physiosum %>%
          week = as.numeric(str_remove(trait, ".*_")),
          dose = as.numeric(str_remove(str_remove(trait, "^[a-z]*_"), "_[0-9]*$")),
          trait = str_remove(trait, "_.*$")) %>%
-  select(-datatype, -rawSD, -strain.sex) %>%
+  select(-dataset, -rawSD, -strain.sex) %>%
   select(trait, week, dose, everything()) %>%
   pivot_longer(-(trait:dose), names_to = "term", values_to = "pvalue") %>%
   mutate(pvalue = -log10(pvalue)) %>%
@@ -489,8 +489,8 @@ round(tmp$loadings[,1:3], 2)
 ## Clustering for plasma
 
 ```{r}
-plasmasum <- readRDS("traitPvalue.rds") %>%
-  filter(datatype == "plasma",
+plasmasum <- readRDS("traitStats.rds") %>%
+  filter(dataset == "plasma",
          p_signal < 0.01) # restrict to traits with strong strain*diet signals
 ```
 
@@ -552,8 +552,8 @@ patchwork::wrap_plots(p, nrow = length(p))
 ## Clustering for liver
 
 ```{r}
-liverPvalue <- readRDS("traitPvalue.rds") %>%
-  filter(datatype == "liver",
+liverPvalue <- readRDS("traitStats.rds") %>%
+  filter(dataset == "liver",
          p_signal < 0.0001) # restrict to traits with strong strain*diet signals
 ```
 

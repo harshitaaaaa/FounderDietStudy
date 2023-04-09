@@ -46,7 +46,7 @@ EnrichHarmony <- function(dataset, links, annot, ...) {
               length(traits))),
           nsample))
   
-  # Area under curve
+  # Area under curve and other time summaries
   auc <- area_under_curve(out)
   
   # These are harmonized columns and their names.
