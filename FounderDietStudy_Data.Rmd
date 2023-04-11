@@ -17,56 +17,20 @@ library(readr)
 library(foundr) # github/byandell/foundr
 ```
 
-Data for this repository are identified by `data/source.csv`,
-which is not saved with the repo.
+Data entry and harmonizing is now done through [DataHarmony.Rmd](https://github.com/byandell/FounderDietStudy/blob/main/DataHarmony.Rmd).
 
-```{r}
-links <- read_csv(file.path("data", "source.csv"))
-```
-
-Data comes from Google Drive <`r linkpath("google", links)`>.
-See the QC Analysis Report on liver RNAseq data (in zip file under folder `Liver RNAseq`).
 # Physiological trait counts by strain, sex, diet
 
 ```{r}
-physiofile <- linkpath("Physio", links)
-excel_sheets(physiofile)
+PhysioData <- readRDS("PhysioData.rds")
 ```
 
-```{r}
-physiodef <- read_excel(physiofile, sheet = 1, skip = 1) %>%
-  unite("comment", -(1:3)) %>%
-  mutate(comment = str_remove(str_replace_all(
-    str_remove_all(comment, "NA"), "_+", "_"), "^_"))
-```
-
-```{r}
-if(file.exists(rdsfile <- "physioData.rds")) {
-  physioData <- readRDS(rdsfile)
-} else {
-  physioData <- read_excel(physiofile, sheet = 2) %>%
-    pivot_longer(-(1:4), names_to = "trait", values_to = "value") %>%
-    mutate(diet = ifelse(as.character(diet) == "200339", "HC_LF", "HF_LC")) %>%
-    rename(condition = "diet",
-           animal = "number") %>%
-    mutate(animal = as.character(animal)) %>%
-    select(strain, sex, animal, condition, trait, value) %>%
-    # Normal scores by trait
-    group_by(trait) %>%
-    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup()
-  
-  saveRDS(physioData, rdsfile)
-}
-rm(rdsfile)
-```
-
-There are `r nrow(distinct(physioData, trait))` distinct traits.
+There are `r nrow(distinct(PhysioData, trait))` distinct traits.
 
 Count of mice per strain, sex and condition. All combinations have at least some measurements.
 
 ```{r}
-physioData %>%
+PhysioData %>%
   filter(!is.na(value)) %>%
   distinct(strain, animal, sex, condition) %>%
   count(strain, sex, condition) %>%
@@ -77,7 +41,7 @@ physioData %>%
 Percent missing values across traits
 
 ```{r}
-physioData %>%
+PhysioData %>%
   filter(!is.na(value)) %>%
   count(strain, sex, condition) %>%
   unite("sex_condition", sex, condition) %>%
@@ -85,67 +49,16 @@ physioData %>%
   pivot_wider(names_from = "sex_condition", values_from = "n")
 ```
 
-## Physiological Signals
-
-```{r}
-if(file.exists(rdsfile <- "physioSignal.rds")) {
-  physioSignal <- readRDS(rdsfile)
-} else {
-  physioSignal <- partition(physioData)
-  
-  saveRDS(physioSignal, rdsfile)
-}
-rm(rdsfile)
-```
-
-## Physiological Stats Summaries
-
-```{r}
-if(file.exists(rdsfile <- "physioStats.rds")) {
-  physioStats <- readRDS(rdsfile)
-} else {
-  physioStats <- strainstats(physioData)
-  
-  saveRDS(physioStats, rdsfile)
-}
-rm(rdsfile)
-```
-
 # Plasma metabolite abundance data
 
 ```{r}
-plasmafile <- linkpath("PlaMet", links)
-excel_sheets(plasmafile)
-```
-
-```{r}
-if(file.exists(rdsfile <- "plasmaData.rds")) {
-  plasmaData <- readRDS(rdsfile)
-} else {
-  plasmaData <- read_excel(plasmafile, sheet = 1, skip = 4) %>%
-    pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
-    mutate(
-      strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
-      number = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
-      sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
-      condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
-    rename(trait = "compound",
-           animal = "number") %>%
-    select(strain, sex, animal, condition, trait, value) %>%
-    # Normal scores by trait
-    group_by(trait) %>%
-    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup()
-  
-  saveRDS(plasmaData, rdsfile)
-}
-rm(rdsfile)
+PlaMet0Data <- readRDS("PlaMet0Data.rds")
 ```
 
 There are missing data for B6 mice across 3 of the 4 `sex:condition` combinations.
 
 ```{r}
-plasmaData %>%
+PlaMet0Data %>%
   filter(!is.na(value)) %>%
   distinct(strain, animal, sex, condition) %>%
   count(strain, sex, condition) %>%
@@ -153,67 +66,13 @@ plasmaData %>%
   pivot_wider(names_from = "sex_condition", values_from = "n")
 ```
 
-Removed plasma data (sheet 1 of spreadsheet) appears to be identical.
-
-```{r}
-removed <- read_excel(plasmafile, sheet = 1, skip = 4) %>%
-  pivot_longer(-(1:4), names_to = "mousecode", values_to = "value") %>%
-  mutate(strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
-         animal = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
-         sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
-         condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
-  rename(trait = "compound")
-```
-
-```{r}
-removed_comp <- (removed %>%
-  filter(!is.na(value)) %>%
-  count(trait))$trait
-plasma_comp <- (plasmaData %>%
-  filter(!is.na(value)) %>%
-  count(trait))$trait
-m <- match(removed_comp, plasma_comp)
-sum(is.na(m))
-```
-
-```{r}
-plasmar <- full_join(
-  plasmaData %>% select(strain, animal, sex, condition, trait, value),
-  removed %>% select(strain, animal, sex, condition, trait, value),
-  by = c("strain", "animal", "sex", "condition", "trait"),
-  suffix = c(".p", ".r"))
-summary(plasmar$value.p - plasmar$value.r)
-```
-
-## Plasma Signals
-
-```{r}
-if(file.exists(rdsfile <- "plasmaSignal.rds")) {
-  plasmaSignal <- readRDS(rdsfile)
-} else {
-  plasmaSignal <- partition(plasmaData)
-  
-  saveRDS(plasmaSignal, rdsfile)
-}
-rm(rdsfile)
-```
-
-## Plasma Stats Summaries
-
-```{r}
-if(file.exists(rdsfile <- "plasmaStats.rds")) {
-  plasmaStats <- readRDS(rdsfile)
-} else {
-  plasmaStats <- strainstats(plasmaData)
-
-  saveRDS(plasmaStats, rdsfile)
-}
-rm(rdsfile)
-```
-
 # Mouse annotations
 
 The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`.
+
+```{r}
+links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
+```
 
 ```{r}
 annotfile <- linkpath("annot", links)
@@ -251,181 +110,16 @@ Note also that the liver data refers to strain `129` as `A129` to not begin with
 this has to be corrected.
 
 ```{r}
-liverfile <- linkpath("LivRna", links)
-```
-
-```{r}
-if(file.exists(rdsfile <- "liverData.rds")) {
-  liverData <- readRDS(rdsfile)
-} else {
-  liverData <- 
-    left_join(
-      left_join(
-        read_csv(liverfile) %>%
-          rename(ENTREZID = "...1") %>%
-          mutate(ENTREZID = as.character(ENTREZID)) %>%
-          pivot_longer(-1, names_to = "strain_number", values_to = "value") %>%
-          separate(strain_number, sep = "_", into = c("strain","number")) %>%
-          mutate(strain = ifelse(strain == "A129", "129", strain)),
-        annot %>%
-          mutate(number = as.character(number)),
-        by = c("strain", "number")),
-      liverAnnot[,-1] %>%
-        mutate(ENTREZID = as.character(ENTREZID)),
-      by = "ENTREZID") %>%
-    filter(value > min(value)) %>% # Minimum is stand-in for missing value.
-    rename(animal = "number",
-           condition = "diet",
-           trait = "SYMBOL") %>%
-    mutate(trait = paste(trait, ENTREZID, sep = "_")) %>%
-    select(strain, sex, animal, condition, trait, value) %>%
-    # Normal scores by trait
-    group_by(trait) %>%
-    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup()
-  
-  saveRDS(liverData, rdsfile)
-}
-rm(rdsfile)
+LivRnaData <- readRDS("LivRnaData.rds")
 ```
 
 Percent missing values
 
 ```{r}
-liverData %>%
+LivRnaData %>%
   filter(!is.na(value)) %>%
   count(strain, sex, condition) %>%
   unite("sex_condition", sex, condition) %>%
   mutate(n = round(100 * (1 - n / max(n)), 2)) %>%
   pivot_wider(names_from = "sex_condition", values_from = "n")
 ```
-
-```{r}
-if(file.exists(rdsfile <- "liverSignal.rds")) {
-  liverSignal <- readRDS(rdsfile)
-} else {
-  liverSignal <- partition(liverData)
-  
-  saveRDS(liverSignal, rdsfile)
-}
-rm(rdsfile)
-```
-
-```{r}
-if(file.exists(rdsfile <- "liverStats.rds")) {
-  liverStats <- readRDS(rdsfile)
-} else {
-  liverStats <- strainstats(liverData)
-  
-  saveRDS(liverStats, rdsfile)
-}
-rm(rdsfile)
-```
-
-# Liver metabolites
-
-```{r}
-LivMetfile <- linkpath("LivMet", links)
-```
-
-```{r}
-if(file.exists(rdsfile <- "LivMetData.rds")) {
-  LivMetData <- readRDS(rdsfile)
-} else {
-  LivMetData <- read_excel(LivMetfile, skip = 3) %>%
-    pivot_longer(-(1:5), names_to = "mousecode", values_to = "value") %>%
-    mutate(
-      strain = str_remove(str_extract(mousecode, "^.*-"), "-"),
-      animal = str_extract(str_remove(mousecode, "^.*-"), "^[0-9]+"),
-      sex = str_extract(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]"),
-      condition = str_remove(str_remove(mousecode, "^.*-[0-9]+_"), "^[MF]_")) %>%
-    rename(trait = "compound") %>%
-    select(strain, sex, animal, condition, trait, value) %>%
-    # Normal scores by trait
-    group_by(trait) %>%
-    mutate(value = foundr::nqrank(value, jitter = TRUE)) %>%
-    ungroup()
-
-  saveRDS(LivMetData, rdsfile)
-}
-rm(rdsfile)
-```
-
-```{r}
-if(file.exists(rdsfile <- "LivMetSignal.rds")) {
-  LivMetSignal <- readRDS(rdsfile)
-} else {
-  LivMetSignal <- partition(LivMetData)
-  
-  saveRDS(LivMetSignal, rdsfile)
-}
-rm(rdsfile)
-```
-
-```{r}
-if(file.exists(rdsfile <- "LivMetStats.rds")) {
-  LivMetStats <- readRDS(rdsfile)
-} else {
-  LivMetStats <- strainstats(LivMetData)
-
-  saveRDS(LivMetStats, rdsfile)
-}
-rm(rdsfile)
-```
-
-# Trait Compilations
-
-Combine all data together into unified objects.
-Drop traits that have missing p-value (due to imbalance of some pathological form).
-
-```{r}
-traitStats <- dplyr::bind_rows(
-  Physio = readRDS("physioStats.rds"),
-  PlaMet = readRDS("plasmaStats.rds"),
-  LivMet = readRDS("LivMetStats.rds"),
-  LivRna = readRDS("liverStats.rds"),
-  .id = "dataset")
-
-dropTraits <- unique(filter(
-  filter(
-    traitStats,
-    term != "noise"),
-  is.na(p.value)))$trait
-
-traitStats <- dplyr::filter(traitStats, !(trait %in% dropTraits))
-
-saveRDS(traitStats, "traitStats.rds")
-readr::write_csv(traitStats, "traitStats.csv")
-
-rm(traitStats)
-
-traitData <- dplyr::bind_rows(
-  Physio = readRDS("physioData.rds"),
-  PlaMet = readRDS("plasmaData.rds"),
-  LivMet = readRDS("LivMetData.rds"),
-  LivRna = readRDS("liverData.rds"),
-  .id = "dataset")
-
-traitData <- dplyr::filter(traitData, !(trait %in% dropTraits))
-
-saveRDS(traitData, "traitData.rds")
-readr::write_csv(traitData, "traitData.csv")
-
-rm(traitData)
-
-traitSignal <- dplyr::bind_rows(
-  Physio = readRDS("physioSignal.rds"),
-  PlaMet = readRDS("plasmaSignal.rds"),
-  LivMet = readRDS("LivMetSignal.rds"),
-  LivRna = readRDS("liverSignal.rds"),
-  .id = "dataset")
-
-traitSignal <- dplyr::filter(traitSignal, !(trait %in% dropTraits))
-
-saveRDS(traitSignal, "traitSignal.rds")
-readr::write_csv(traitSignal, "traitSignal.csv")
-
-rm(traitSignal)
-```
-
-

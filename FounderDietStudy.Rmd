@@ -73,18 +73,18 @@ meas <- meas %>%
   filter(trait %in% traits)
 ```
 
-Here we pick out 6 compounds with the lowest absolute value and compares sex, diet and strain.
+Here we pick out 6 compounds with the lowest absolute value and compares sex, condition and strain.
 
 ```{r}
 plot(traitSolos(meas))
 ```
 
 ```{r warnings = FALSE}
-condition <- "sex_diet"
+condition <- "sex_condition"
 form <- formula(".data$trait ~ .data$strain")
 ggplot(meas %>%
-         unite(sex_diet, sex, diet)) +
-  aes(sex_diet, value, col = .data[[condition]]) +
+         unite(sex_condition, sex, condition)) +
+  aes(sex_condition, value, col = .data[[condition]]) +
   geom_jitter() +
   facet_grid(form, scales = "free_y") +
   theme(legend.position = "none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
@@ -93,16 +93,15 @@ ggplot(meas %>%
 ```{r}
 dat <- meas %>%
   filter(trait %in% traits[1:2]) %>%
-  select(strain, number, sex, diet, trait, value) %>%
+  select(strain, animal, sex, condition, trait, value) %>%
   pivot_wider(names_from = "trait", values_from = "value")
-load("data/CCcolors.RData")
 plotly::ggplotly(
   ggplot(dat) +
     aes(.data[[traits[1]]], .data[[traits[2]]], color = strain) +
     geom_smooth(method = "lm", se = FALSE) +
     geom_point(size = 2) +
     scale_color_manual(values = CCcolors) +
-    facet_grid(sex ~ diet, scales = "free")) 
+    facet_grid(sex ~ condition, scales = "free")) 
 ```
 
 ## More than two pairs
@@ -119,11 +118,11 @@ dat <-
         meas %>%
           filter(trait %in% x) %>%
           mutate(trait = c("left","right")[match(trait, x)]) %>%
-          select(strain, number, sex, diet, trait, value) %>%
+          select(strain, animal, sex, condition, trait, value) %>%
           pivot_wider(names_from = "trait", values_from = "value")
       }),
     .id = "pair") %>%
-  unite(sex_diet, sex, diet) %>%
+  unite(sex_condition, sex, condition) %>%
   mutate(pair1 = as.matrix(traitpairs)[1, pair],
          pair2 = as.matrix(traitpairs)[2, pair]) %>%
   select(pair1, pair2, everything())
@@ -134,7 +133,7 @@ plotly::ggplotly(
     geom_smooth(method = "lm", se = FALSE) +
     geom_point(size = 2) +
     scale_color_manual(values = CCcolors) +
-    facet_grid(pair2 + pair1 ~ sex_diet, scales = "free"))
+    facet_grid(pair2 + pair1 ~ sex_condition, scales = "free"))
 ```
 
 ```{r}
@@ -157,15 +156,15 @@ dat <-
       out <- meas %>%
         filter(trait %in% x) %>%
         mutate(trait = c(x[1],x[2])[match(trait, x)]) %>%
-        select(strain, number, sex, diet, trait, value) %>%
+        select(strain, animal, sex, condition, trait, value) %>%
         pivot_wider(names_from = "trait", values_from = "value") %>%
-        unite(sex_diet, sex, diet)
+        unite(sex_condition, sex, condition)
       ggplot(out) +
         aes(.data[[x[1]]], .data[[x[2]]], color = strain) +
         geom_smooth(method = "lm", se = FALSE, formula = "y ~ x") +
         geom_point(size = 2) +
         scale_color_manual(values = CCcolors) +
-        facet_grid(. ~ sex_diet) +
+        facet_grid(. ~ sex_condition) +
         theme(legend.position = "none")
     })
 ```
@@ -182,19 +181,19 @@ Replaced variability in order (which does not really work) with
 `p_signal` something like `broom::tidy(stats::anova(fitfull, fitred))`
 where `fitfull` has model 
 
-`trait ~ strain * sex * diet`
+`trait ~ strain * sex * condition`
 
 and `fitred` has model
 
-`trait ~ strain * se + sex * diet`
+`trait ~ strain * se + sex * condition`
 
-That is, we remove overall strain effect but combine `strain:sex`, `strain:diet` and `strain:sex:diet`.
+That is, we remove overall strain effect but combine `strain:sex`, `strain:condition` and `strain:sex:condition`.
 
 ```{r}
 tmp <- meas %>% filter(trait == traits[1])
-formful <- formula(value ~ strain * sex * diet)
+formful <- formula(value ~ strain * sex * condition)
 fitful <- stats::lm(formful, tmp)
-formred <- formula(value ~ strain * sex + sex * diet)
+formred <- formula(value ~ strain * sex + sex * condition)
 fitred <- stats::lm(formred, tmp)
       
 (broom::tidy(stats::anova(fitred, fitful)) %>%
@@ -213,8 +212,13 @@ traitStats <- readRDS("traitStats.rds")
 
 ```{r}
 logpval <- function(x) pmin(5, -log10(x))
-ggplot(traitStats %>% arrange(p_signal)) +
-  aes(logpval(p_diet), logpval(p_sex_diet), col = logpval(p_signal)) +
+ggplot(traitStats %>%
+         select(-SD) %>%
+         filter(term %in%
+                  c("signal", "strain_condition", "strain_sex_condition")) %>%
+         mutate(p.value = logpval(p.value)) %>%
+         pivot_wider(names_from = "term", values_from = "p.value")) +
+  aes(strain_condition, strain_sex_condition, col = signal) +
   geom_point(alpha = 0.75, shape = 21) +
   geom_smooth() +
   facet_wrap(~ dataset, scales = "free") +
@@ -222,38 +226,120 @@ ggplot(traitStats %>% arrange(p_signal)) +
 ```
 
 ```{r}
-pvals <- traitStats %>%
-  select(-rawSD) %>%
-  pivot_longer(-(dataset:trait), values_to = "pvalue", names_to = "term")
-```
-
-```{r}
-ggplot(pvals) +
-  aes(pvalue, col = dataset) +
+ggplot(traitStats %>% filter(term != "noise")) +
+  aes(-log10(p.value), col = dataset) +
   geom_density() +
-  facet_grid(. ~ term)
+  facet_wrap(~ term) +
+  scale_x_log10()
 ```
 
 # Analysis over time
 
 ```{r}
-consumed <- colnames(cors)[grep("consumed", colnames(cors))]
-bw <- colnames(cors)[grep("BW", colnames(cors))]
-gtt <- colnames(cors)[grep("GTT", colnames(cors))]
+week_traits <- timetraits(traitStats, "week")
+min_traits <- timetraits(traitStats, "minute")
 ```
 
 ```{r}
-physiosum <- (traitStats %>% filter(dataset == "physio"))
+traitSignal <- readRDS("traitSignal.rds")
+```
+
+```{r}
+minData <- traitTimes(traitData, traitSignal, min_traits[1:2], "cellmean", "minute")
+```
+
+```{r}
+plot(minData)
+```
+
+```{r}
+plot(minData, facet_strain = TRUE)
+```
+
+## Stats over time
+
+Pieces are in place, a little kludgey but externally looks good. Think about how to install on app.
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[11:13], "p.value", "minsum")
+```
+
+```{r}
+plot(minStats)
+```
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[11:13], "p.value", "minute")
+```
+
+```{r}
+plot(minStats)
+```
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minsum")
+```
+
+```{r}
+plot(minStats)
+```
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minsum")
+```
+
+```{r}
+plot(minStats)
+```
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minute")
+```
+
+```{r}
+plot(minStats)
+```
+
+```{r}
+minStats <- traitTimes(traitStats, min_traits[6:10], "p.value", "minute")
+```
+
+```{r}
+plot(minStats)
 ```
 
 ## Body Weight (BW)
 
 ```{r}
-bwsum <- physiosum %>%
+wkData <- traitTimes(traitData, traitSignal, week_traits[1], "cellmean", "week")
+```
+
+```{r}
+plot(wkData)
+```
+
+```{r}
+wkData <- traitTimes(traitStats, traitnames = week_traits[1], response = "p.value", timecol = "week")
+```
+
+```{r}
+plot(wkData)
+```
+
+```{r}
+wkData <- traitTimes(traitStats, traitnames = week_traits[1], response = "SD", timecol = "week")
+```
+
+```{r}
+plot(wkData)
+```
+
+```{r}
+bwsum <- PhysioStats %>%
   filter(trait %in% bw, grepl("wk$", trait)) %>%
   mutate(trait = as.numeric(str_remove(str_remove(trait, "^BW_"), "wk$"))) %>%
   rename(week = "trait") %>%
-  select(-dataset, -rawSD, -strain.sex) %>%
+  select(-dataset, -strain_sex) %>%
   pivot_longer(-week, names_to = "term", values_to = "pvalue") %>%
   mutate(pvalue = -log10(pvalue)) %>%
   arrange(term, week)
@@ -284,7 +370,7 @@ ggplot_time(outbw %>% select(-value, -ancillary, -noise) %>% rename(value = "sig
 ## Kcal consumed
 
 ```{r}
-kcsum <- physiosum %>%
+kcsum <- PhysioStats %>%
   filter(trait %in% consumed, grepl("^kcal_", trait)) %>%
   mutate(trait = as.numeric(str_remove(str_remove(trait, "^kcal_consumed_"), "wk$"))) %>%
   rename(week = "trait") %>%
@@ -320,7 +406,7 @@ ggplot_time(outkcal %>% select(-value, -ancillary, -noise) %>% rename(value = "s
 ## GTT consumed
 
 ```{r}
-gttsum <- physiosum %>%
+gttsum <- PhysioStats %>%
   filter(trait %in% gtt, grepl("^GTT_", trait)) %>%
   mutate(trait = str_remove(str_remove(trait, "^GTT_"), "wk$"),
          week = as.numeric(str_remove(trait, ".*_")),
@@ -362,43 +448,43 @@ outgtt <- out %>%
 ```
 
 ```{r}
-ggplot(outgtt %>% filter(trait == "glu") %>% unite("sex_diet", sex, diet)) +
+ggplot(outgtt %>% filter(trait == "glu") %>% unite("sex_condition", sex, condition)) +
     aes(dose, value, fill = strain, color = strain) +
     geom_jitter(shape = 21, size = 2, color = "black") +
     geom_smooth(se = FALSE) +
-    facet_grid(week ~ sex_diet) +
+    facet_grid(week ~ sex_condition) +
     scale_color_manual(values = CCcolors) +
     scale_fill_manual(values = CCcolors)
 ```
 
 ```{r}
 ggplot(outgtt %>% select(-value, -ancillary, -noise) %>% rename(value = "signal") %>%
-         filter(trait == "glu") %>% unite("sex_diet", sex, diet)) +
+         filter(trait == "glu") %>% unite("sex_condition", sex, condition)) +
     aes(dose, value, fill = strain, color = strain) +
     geom_jitter(shape = 21, size = 2, color = "black") +
     geom_smooth(se = FALSE) +
-    facet_grid(week ~ sex_diet) +
+    facet_grid(week ~ sex_condition) +
     scale_color_manual(values = CCcolors) +
     scale_fill_manual(values = CCcolors)
 ```
 
 ```{r}
-ggplot(outgtt %>% filter(trait != "glu") %>% unite("sex_diet", sex, diet)) +
+ggplot(outgtt %>% filter(trait != "glu") %>% unite("sex_condition", sex, condition)) +
     aes(dose, value, fill = strain, color = strain) +
     geom_jitter(shape = 21, size = 2, color = "black") +
     geom_smooth(se = FALSE) +
-    facet_grid(trait ~ sex_diet, scales = "free_y") +
+    facet_grid(trait ~ sex_condition, scales = "free_y") +
     scale_color_manual(values = CCcolors) +
     scale_fill_manual(values = CCcolors)
 ```
 
 ```{r}
 ggplot(outgtt %>% select(-value, -ancillary, -noise) %>% rename(value = "signal")
-       %>% filter(trait != "glu") %>% unite("sex_diet", sex, diet)) +
+       %>% filter(trait != "glu") %>% unite("sex_condition", sex, condition)) +
     aes(dose, value, fill = strain, color = strain) +
     geom_jitter(shape = 21, size = 2, color = "black") +
     geom_smooth(se = FALSE) +
-    facet_grid(trait ~ sex_diet, scales = "free_y") +
+    facet_grid(trait ~ sex_condition, scales = "free_y") +
     scale_color_manual(values = CCcolors) +
     scale_fill_manual(values = CCcolors)
 ```
@@ -424,6 +510,10 @@ Operations:
 - find representer (eigenvector) for clusters
 
 **need to add how many traits in each group**
+
+```{r}
+knitr::knit_exit()
+```
 
 #### Clustering for physio
 
@@ -491,7 +581,7 @@ round(tmp$loadings[,1:3], 2)
 ```{r}
 plasmasum <- readRDS("traitStats.rds") %>%
   filter(dataset == "plasma",
-         p_signal < 0.01) # restrict to traits with strong strain*diet signals
+         p_signal < 0.01) # restrict to traits with strong strain*condition signals
 ```
 
 ```{r}
@@ -500,8 +590,8 @@ outma <- partition(readRDS("plasma.rds")) %>%
   filter(trait %in% plasmasum$trait)
 ```
 
-Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
-That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+Spearman rank correlation of residuals after removing `strain*sex` and `condition*sex` effects.
+That is, looking at correlation due to `strain*condition` and `strain*condition*sex` effects only.
 
 ```{r}
 corsmaraw <- abscorcalc(outma %>% select(-signal, -ancillary, -noise))
@@ -554,7 +644,7 @@ patchwork::wrap_plots(p, nrow = length(p))
 ```{r}
 liverPvalue <- readRDS("traitStats.rds") %>%
   filter(dataset == "liver",
-         p_signal < 0.0001) # restrict to traits with strong strain*diet signals
+         p_signal < 0.0001) # restrict to traits with strong strain*condition signals
 ```
 
 ```{r}
@@ -563,8 +653,8 @@ liverData <- partition(readRDS("liver.rds")) %>%
   filter(trait %in% liverPvalue$trait)
 ```
 
-Spearman rank correlation of residuals after removing `strain*sex` and `diet*sex` effects.
-That is, looking at correlation due to `strain*diet` and `strain*diet*sex` effects only.
+Spearman rank correlation of residuals after removing `strain*sex` and `condition*sex` effects.
+That is, looking at correlation due to `strain*condition` and `strain*condition*sex` effects only.
 
 ```{r}
 corsli <- abscorcalc(liverData %>% select(-value, -ancillary, -noise) %>% rename(value = "signal"))

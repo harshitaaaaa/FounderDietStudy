@@ -9,6 +9,7 @@ params:
 resource_files:
 - traitData.rds
 - traitSignal.rds
+- traitStats.rds
 ---
 
 ```{r setup, include=FALSE}
@@ -28,6 +29,7 @@ setwd("~/Documents/Research/attie_alan/FounderDietStudy/")
 ```{r}
 traitData <- readRDS("traitData.rds")
 traitSignal <- readRDS("traitSignal.rds")
+traitStats <- readRDS("traitStats.rds")
 ```
 
 ```{r}
@@ -35,27 +37,27 @@ dtraits <- foundr::timetraits(traitSignal, "week")
 ```
 
 ```{r}
-traitTime <- foundr::strain_time(traitData, traitSignal,
-                           c("Physio: BW", "Physio: BL"),
-                           "cellmean", "week")
-```
-
-```{r}
-traitTime <- foundr::strain_time(traitData, traitSignal,
+traitTime <- foundr::traitTimes(traitData, traitSignal,
                            "Physio: BW",
                            "cellmean", "week")
 ```
 
 ```{r}
-print(foundr::ggplot_strain_time(traitTime))
+print(plot(traitTime))
 ```
 
 ```{r}
-print(foundr::ggplot_strain_time(traitTime, facet_strain = TRUE))
+traitTime <- foundr::traitTimes(traitData, traitSignal,
+                           c("Physio: BW", "Physio: BL"),
+                           "cellmean", "week")
 ```
 
 ```{r}
-print(foundr::ggplot_strain_time(traitTime,
+print(foundr::ggplot_traitTimes(traitTime, facet_strain = TRUE))
+```
+
+```{r}
+print(foundr::ggplot_traitTimes(traitTime,
   facet_strain = TRUE))
 ```
 
@@ -65,10 +67,10 @@ print(foundr::ggplot_strain_time(traitTime,
 shiny::fluidRow(
   shiny::column(
     3,
-    shiny::selectInput("time", "Time Unit:", c("week", "minute"))),
+    shiny::selectInput("time", "Time Unit:", c("week", "minute","minsum"))),
   shiny::column(
     3,
-    shiny::selectInput("trait", "Trait:", NULL)),
+    shiny::selectInput("trait", "Trait:", NULL, multiple = TRUE)),
   shiny::column(
     3,
     shiny::checkboxInput("facet_strain", "Facet Strain?", FALSE)),
@@ -80,7 +82,8 @@ shiny::fluidRow(
 ```{r}
 timetraits <- shiny::reactive({
   shiny::req(input$time)
-  foundr::timetraits(traitSignal, input$time)
+  timecol <- ifelse(input$time == "minsum", "minute", input$time)
+  foundr::timetraits(traitSignal, timecol)
 })
 ```
 
@@ -98,7 +101,7 @@ shiny::observeEvent(
 ```{r}
 traitTime <- shiny::reactive({
   shiny::req(input$trait, input$response, input$time)
-  foundr::strain_time(
+  foundr::traitTimes(
     traitData, traitSignal,
     input$trait, input$response, input$time)
 })
@@ -106,8 +109,27 @@ traitTime <- shiny::reactive({
 
 ```{r}
 shiny::renderPlot({
-  print(foundr::ggplot_strain_time(
+  print(foundr::ggplot_traitTimes(
     traitTime(),
     facet_strain = input$facet_strain))
+})
+```
+
+Need to change response to be p.value or SD.
+
+```{r}
+traitSum <- shiny::reactive({
+  shiny::req(input$trait, input$time)
+  foundr::traitTimes(
+    traitStats,
+    input$trait, "p.value", input$time)
+})
+```
+
+```{r}
+shiny::renderPlot({
+  print(foundr::ggplot_traitTimes(
+    traitSum(),
+    facet_strain = TRUE))
 })
 ```

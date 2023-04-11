@@ -22,8 +22,10 @@ for(filename in list.files("R", full.names = TRUE)) {
 }
 ```
 
-
 # Harmonize Data
+
+Data for this repository are identified by `data/source.csv`,
+which is saved with the repo.
 
 ```{r}
 links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
