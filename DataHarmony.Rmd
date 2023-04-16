@@ -45,25 +45,25 @@ annot <- read_excel(annotfile) %>%
 ## Physio: Physiological traits
 
 ```{r}
-harmonize("Physio", links, PhysioHarmony)
+harmonize("Physio", links, PhysioHarmony, condition_name = "diet")
 ```
 
 ## PlaMet: Plasma metabolites
 
 ```{r warning = FALSE}
-harmonize("PlaMet0", links, MetHarmony, annot, skiprows = 4)
+harmonize("PlaMet0", links, MetHarmony, annot, skiprows = 4, condition_name = "diet")
 ```
 
 ## PlaMet120: Plasma metabolites at 120 minutes
 
 ```{r warning = FALSE}
-harmonize("PlaMet120", links, MetHarmony, annot, skiprows = 3)
+harmonize("PlaMet120", links, MetHarmony, annot, skiprows = 3, condition_name = "diet")
 ```
 
 ## LivMet: Liver metabolites
 
 ```{r warning = FALSE}
-harmonize("LivMet", links, MetHarmony, annot, skiprows = 3)
+harmonize("LivMet", links, MetHarmony, annot, skiprows = 3, condition_name = "diet")
 ```
 
 ## LivRna: Liver mRNA expression
@@ -76,13 +76,13 @@ liverAnnot <- read_csv(liverAnnot)
 ```
 
 ```{r warning = FALSE}
-harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot)
+harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot, condition_name = "diet")
 ```
 
 ## Enrich: Plasma enrichment over time
 
 ```{r}
-harmonize("Enrich", links, EnrichHarmony, annot)
+harmonize("Enrich", links, EnrichHarmony, annot, condition_name = "diet")
 ```
 
 ## Module: WGCNA module eigentraits
@@ -95,10 +95,9 @@ traitModule <- readRDS("traitModule.rds")
 
 ```{r}
 harmonize("Module", links, foundr::moduleHarmony,
-          traitModule)
+          traitModule, condition_name = "diet")
 ```
 
 ```{r}
 bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Module","Enrich"))
 ```
-

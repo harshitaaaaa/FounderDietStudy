@@ -57,8 +57,26 @@ print(foundr::ggplot_traitTimes(traitTime, facet_strain = TRUE))
 ```
 
 ```{r}
-print(foundr::ggplot_traitTimes(traitTime,
-  facet_strain = TRUE))
+p1 <- foundr::ggplot_traitTimes(traitTime,
+  facet_strain = TRUE)
+print(p1)
+```
+
+## Stats
+
+```{r}
+traitSum <- foundr::traitTimes(traitStats,
+                           c("Physio: BW", "Physio: BL"),
+                           "p.value", "week", "terms")
+```
+
+```{r}
+p2 <- foundr::ggplot_traitTimes(traitSum)
+print(p2)
+```
+
+```{r}
+cowplot::plot_grid(p1,p2, ncol = 2)
 ```
 
 # Shiny Code
@@ -67,7 +85,7 @@ print(foundr::ggplot_traitTimes(traitTime,
 shiny::fluidRow(
   shiny::column(
     3,
-    shiny::selectInput("time", "Time Unit:", c("week", "minute","minsum"))),
+    shiny::selectInput("time", "Time Unit:", c("week", "minute","minute_summary"))),
   shiny::column(
     3,
     shiny::selectInput("trait", "Trait:", NULL, multiple = TRUE)),
@@ -82,7 +100,7 @@ shiny::fluidRow(
 ```{r}
 timetraits <- shiny::reactive({
   shiny::req(input$time)
-  timecol <- ifelse(input$time == "minsum", "minute", input$time)
+  timecol <- ifelse(input$time == "minute_summary", "minute", input$time)
   foundr::timetraits(traitSignal, timecol)
 })
 ```
@@ -108,25 +126,35 @@ traitTime <- shiny::reactive({
 ```
 
 ```{r}
+traitSum <- shiny::reactive({
+  shiny::req(input$trait, input$time)
+  foundr::traitTimes(
+    traitStats,
+    input$trait, "p.value", input$time, "terms")
+})
+```
+ 
+Want legend for terms to be over 3 lines instead of 2.
+
+```{r}
 shiny::renderPlot({
-  print(foundr::ggplot_traitTimes(
+  p1 <- foundr::ggplot_traitTimes(
     traitTime(),
-    facet_strain = input$facet_strain))
+    facet_strain = input$facet_strain)
+  
+  p2 <- foundr::ggplot_traitTimes(
+    traitSum(),
+    facet_strain = TRUE) + 
+    ggplot2::guides(color = ggplot2::guide_legend(nrow=3,
+                                              byrow=TRUE))
+
+  print(cowplot::plot_grid(p1,p2, ncol = 2, rel_widths = c(2.5,1)))
 })
 ```
 
 Need to change response to be p.value or SD.
 
-```{r}
-traitSum <- shiny::reactive({
-  shiny::req(input$trait, input$time)
-  foundr::traitTimes(
-    traitStats,
-    input$trait, "p.value", input$time)
-})
-```
-
-```{r}
+```{r eval=FALSE}
 shiny::renderPlot({
   print(foundr::ggplot_traitTimes(
     traitSum(),

@@ -261,7 +261,7 @@ plot(minData, facet_strain = TRUE)
 Pieces are in place, a little kludgey but externally looks good. Think about how to install on app.
 
 ```{r}
-minStats <- traitTimes(traitStats, min_traits[11:13], "p.value", "minsum")
+minStats <- traitTimes(traitStats, min_traits[11:13], "p.value", "minute_summary")
 ```
 
 ```{r}
@@ -277,7 +277,7 @@ plot(minStats)
 ```
 
 ```{r}
-minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minsum")
+minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minute_summary")
 ```
 
 ```{r}
@@ -285,7 +285,7 @@ plot(minStats)
 ```
 
 ```{r}
-minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minsum")
+minStats <- traitTimes(traitStats, min_traits[1:5], "p.value", "minute_summary")
 ```
 
 ```{r}
