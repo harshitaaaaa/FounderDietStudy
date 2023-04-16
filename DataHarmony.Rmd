@@ -28,7 +28,18 @@ Data for this repository are identified by `data/source.csv`,
 which is saved with the repo.
 
 ```{r}
-links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
+rootdir <- "/mnt/researchdrive/adattie/General/founder_diet_study"
+rawdir <- file.path(rootdir, "RawData")
+harmonizeddir <- file.path(rootdir, "HarmonizedData")
+```
+
+```{r}
+setwd(harmonizeddir)
+```
+
+```{r}
+links <- read.csv(file.path("data", "source.csv"), fill = TRUE) %>%
+  mutate(address = file.path(rawdir, address))
 ```
 
 ## Annotation
