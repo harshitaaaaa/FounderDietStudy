@@ -71,7 +71,7 @@ PlaMet0Data %>%
 The experiment annotation file relates the `number` (identifier for `animal`) to the `sex` and `diet`.
 
 ```{r}
-links <- read.csv(file.path("data", "source.csv"), fill = TRUE)
+links <- read.csv(file.path("data", "RawData", "source.csv"), fill = TRUE)
 ```
 
 ```{r}

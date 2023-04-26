@@ -6,9 +6,11 @@ devtools::install_cran("ggdendro") #  not yet on UW dataviz
 devtools::install_github("byandell/foundr")
 library(foundr)
 
-traitData <- readRDS("traitData.rds")
-traitStats <- readRDS("traitStats.rds")
-traitSignal <- readRDS("traitSignal.rds")
+harmonizeddir <- "/mnt/researchdrive/adattie/General/founder_diet_study/HarmonizedData"
+traitDir <- "Normalized" # "Unnormalized"
+traitData <- readRDS(file.path(harmonizeddir, traitDir, "traitData.rds"))
+traitStats <- readRDS(file.path(harmonizeddir, traitDir, "traitStats.rds"))
+traitSignal <- readRDS(file.path(harmonizeddir, traitDir, "traitSignal.rds"))
 customSettings <- list(
   help = "help.md",
   condition = "diet",

@@ -5,14 +5,11 @@
 *.Rproj
 .DS_Store
 *.html
-data/
 *.rds
-*.csv
 *.zip
 rsconnect/
 *.docx
 *.pptx
-RawData/
 inst/
 *.pdf
 *.xlsx

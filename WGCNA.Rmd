@@ -3,15 +3,30 @@ title: "WGCNA"
 author: "Brian Yandell"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
+params:
+  echo: no
+  rootdir: /mnt/researchdrive/adattie/General/founder_diet_study
 ---
 
+```{r}
+rawdir <- file.path(params$rootdir, "RawData")
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
+```
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = harmonizeddir)
 ```
 
 ```{r}
 options(stringsAsFactors = FALSE)
 ```
+
+Goal: Have one set of routines in package modulr to create module objects and to read module objects provided by Mark.
+Note that `geneTree` object is being changed to `dendro`; need to change already stored objects.
+Probably get away for now from value, signal, cellmean, noise construction as too confusing to audience;
+keep around for later study, perhaps.
+Probably simplify from `listof_...` to modules; later consider generic module object (which may not rely on dendro).
 
 ```{r eval = FALSE}
 # Need VPN and connection to ResearchDrive server
@@ -29,12 +44,6 @@ BiocManager::install("impute")
 BiocManager::install("preprocessCore")
 ```
 
-```{r}
-datadir <- "~/Documents/Research/attie_alan/FounderDietStudy"
-setwd(datadir)
-datadir <- "."
-```
-
 # WGCNA 
 
 Read or save (RDS) module information for each dataset.
@@ -47,14 +56,14 @@ datasets <- c("LivMet","PlaMet0","PlaMet120","LivRna")
 for(mod in datasets) {
   modname <- paste0(mod, "Module")
   if(file.exists(
-    filename <- file.path(datadir, paste0(mod, "Module.rds")))) {
+    filename <- file.path(harmonizeddir, mod, paste0(mod, "Module.rds")))) {
     assign(modname, readRDS(filename))
   } else {
     # Create list of WGCNA modules.
     assign(modname, 
       modulr::listof_wgcnaModules(
-        readRDS(file.path(datadir, paste0(mod, "Data", ".rds"))),
-        readRDS(file.path(datadir, paste0(mod, "Signal", ".rds")))))
+        readRDS(file.path(harmonizeddir, mod, paste0(mod, "Data", ".rds"))),
+        readRDS(file.path(harmonizeddir, mod, paste0(mod, "Signal", ".rds")))))
     
     # Save listof_wgcnaModules object.
     saveRDS(
@@ -67,7 +76,8 @@ for(mod in datasets) {
 Create `traitModule` object as list of dataset module objects.
 
 ```{r}
-if(file.exists(filename <- file.path(datadir, "traitModule.rds"))) {
+normdir <- "Normalized"
+if(file.exists(filename <- file.path(harmonizeddir, normdir, "traitModule.rds"))) {
   traitModule <- readRDS(filename)
 } else {
   traitModule <- list()
@@ -75,7 +85,7 @@ if(file.exists(filename <- file.path(datadir, "traitModule.rds"))) {
     traitModule[[mod]] <- 
       readRDS(
         file.path(
-          datadir,
+          harmonizeddir, mod,
           paste0(mod, "Module.rds")))
   }
   saveRDS(traitModule, filename)
@@ -154,8 +164,8 @@ foundr::ggplot_traitSolos(moduleSolo)
 ```
 
 ```{r}
-traitData <- readRDS(file.path(datadir, "traitData.rds"))
-traitSignal <- readRDS(file.path(datadir, "traitSignal.rds"))
+traitData <- readRDS(file.path(harmonizeddir, normdir, "traitData.rds"))
+traitSignal <- readRDS(file.path(harmonizeddir, normdir, "traitSignal.rds"))
 ```
 
 ### LivMet greenyellow module
@@ -301,11 +311,11 @@ plotly::ggplotly(
 ```{r}
 traitData <- 
   dplyr::filter(
-      readRDS(file.path(datadir, "traitData.rds")),
+      readRDS(file.path(harmonizeddir, normdir, "traitData.rds")),
       dataset %in% c("LivMet","PlaMet0"))
 traitSignal <-
     dplyr::filter(
-      readRDS(file.path(datadir, "traitSignal.rds")),
+      readRDS(file.path(harmonizeddir, normdir, "traitSignal.rds")),
       dataset %in% c("LivMet","PlaMet0"))
 ```
 
@@ -335,5 +345,73 @@ eigenMet <- foundr::eigen_cor(valueMet)
 
 ```{r}
 ggplot2::autoplot(eigenMet, "LivMet", "PlaMet0")
+```
+
+# WGCNA from Mark
+
+All metabolites: liver, plasma at 0min, and plasma at 120min.
+Rankz transformation to normalize.
+Unsigned modules
+beta=12
+modSize = 4
+
+This is the basis for a read WGCN routine. can use 
+
+
+```{r}
+moddir <- file.path(rawdir, "WGCNA_modules_all_metabolites")
+```
+
+```{r}
+load(file.path(moddir, "WGCNA_objects_ms10.Rdata"))
+```
+
+```{r}
+names(merge)
+```
+
+```{r}
+traitModule <- readRDS(file.path(harmonizeddir, "Module", "traitModule.rds"))
+```
+
+```{r}
+names(traitModule$PlaMet0$value)
+```
+
+```{r}
+head(traitModule$PlaMet0$value$ID)
+```
+
+```{r}
+str(merge$dendro)
+```
+
+```{r}
+str(traitModule$PlaMet0$value$geneTree)
+```
+
+```{r}
+str(merge$newMEs)
+```
+
+```{r}
+str(traitModule$PlaMet0$value$eigen)
+```
+
+```{r}
+str(merge$colors)
+```
+
+
+```{r}
+str(traitModule$PlaMet0$value$modules)
+```
+
+```{r}
+tmp <- modulr::module_factors(kMEs, merge$colors)
+str(tmp)
+```
+```{r}
+ms10Module <- modulr::load_wgcna(moddir, "WGCNA_objects_ms10.Rdata")
 ```
 

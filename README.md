@@ -1,5 +1,7 @@
 # Support repository for Founder Diet Study
 
+See [data/ReadMe.md](https://github.com/byandell/FounderDietStudy/blob/main/data/ReadMe.md) for information on raw data.
+
 See [https://data-viz.it.wisc.edu/FounderDietStudy/](https://data-viz.it.wisc.edu/FounderDietStudy/) app (limited access) for interactive data tool.
 More information found on [Shared Google Drive](https://drive.google.com/drive/u/1/folders/0AGugqlk2Del8Uk9PVA) (limited invitations).
 

@@ -5,26 +5,25 @@ date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 params:
   echo: no
+  rootdir: /mnt/researchdrive/adattie/General/founder_diet_study
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```{r}
+rawdir <- file.path(params$rootdir, "RawData")
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
 ```
 
-```{r}
-#devtools::install_github("byandell/foundr")
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = params$echo, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = params$rootdir)
 ```
 
 # Traits over time
 
 ```{r}
-setwd("~/Documents/Research/attie_alan/FounderDietStudy/")
-```
-
-```{r}
-traitData <- readRDS("traitData.rds")
-traitSignal <- readRDS("traitSignal.rds")
-traitStats <- readRDS("traitStats.rds")
+traitData <- readRDS(file.path(harmonizeddir, "Normalized", "traitData.rds"))
+traitSignal <- readRDS(file.path(harmonizeddir, "Normalized", "traitSignal.rds"))
+traitStats <- readRDS(file.path(harmonizeddir, "Normalized", "traitStats.rds"))
 ```
 
 ```{r}
@@ -66,7 +65,7 @@ traitSum <- foundr::traitTimes(traitStats,
 ```
 
 ```{r}
-p2 <- foundr::ggplot_traitTimes(traitSum)
+p2 <- foundr::ggplot_traitTimes(traitSum, span = 0.75)
 print(p2)
 ```
 
@@ -98,11 +97,12 @@ timetable <- function(object) {
 ```
 
 ```{r}
-timetable(traitSum)
-```
-
-```{r}
-dplyr::bind_rows(traitSum, .id = "traitname")
+dplyr::filter(
+  dplyr::arrange(
+    timetable(traitSum),
+    p.value),
+  (term %in% c("strain:diet", "strain:sex:diet")),
+  p.value < .2)
 ```
 
 ## Stats Summaries

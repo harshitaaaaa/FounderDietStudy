@@ -3,10 +3,19 @@ title: "Data Harmony"
 author: "Brian Yandell"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
+params:
+  echo: no
+  rootdir: /mnt/researchdrive/adattie/General/founder_diet_study
 ---
+
+```{r}
+rawdir <- file.path(params$rootdir, "RawData")
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = harmonizeddir)
 ```
 
 ```{r}
@@ -24,21 +33,18 @@ for(filename in list.files("R", full.names = TRUE)) {
 
 # Harmonize Data
 
-Data for this repository are identified by `data/source.csv`,
+Data for this repository are identified by `data/RawData/source.csv`,
 which is saved with the repo.
 
+Condition name and normalize
+
 ```{r}
-rootdir <- "/mnt/researchdrive/adattie/General/founder_diet_study"
-rawdir <- file.path(rootdir, "RawData")
-harmonizeddir <- file.path(rootdir, "HarmonizedData")
+condition_name <- "diet"
+normalize <- FALSE
 ```
 
 ```{r}
-setwd(harmonizeddir)
-```
-
-```{r}
-links <- read.csv(file.path("data", "source.csv"), fill = TRUE) %>%
+links <- read.csv(file.path("data", "RawData", "source.csv"), fill = TRUE) %>%
   mutate(address = file.path(rawdir, address))
 ```
 
@@ -63,19 +69,22 @@ harmonize("Physio", links, PhysioHarmony, condition_name = "diet")
 ## PlaMet: Plasma metabolites
 
 ```{r warning = FALSE}
-harmonize("PlaMet0", links, MetHarmony, annot, skiprows = 4, condition_name = "diet")
+harmonize("PlaMet0", links, MetHarmony, annot, skiprows = 4,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ## PlaMet120: Plasma metabolites at 120 minutes
 
 ```{r warning = FALSE}
-harmonize("PlaMet120", links, MetHarmony, annot, skiprows = 3, condition_name = "diet")
+harmonize("PlaMet120", links, MetHarmony, annot, skiprows = 3,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ## LivMet: Liver metabolites
 
 ```{r warning = FALSE}
-harmonize("LivMet", links, MetHarmony, annot, skiprows = 3, condition_name = "diet")
+harmonize("LivMet", links, MetHarmony, annot, skiprows = 3,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ## LivRna: Liver mRNA expression
@@ -88,13 +97,15 @@ liverAnnot <- read_csv(liverAnnot)
 ```
 
 ```{r warning = FALSE}
-harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot, condition_name = "diet")
+harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ## Enrich: Plasma enrichment over time
 
 ```{r}
-harmonize("Enrich", links, EnrichHarmony, annot, condition_name = "diet")
+harmonize("Enrich", links, EnrichHarmony, annot,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ## Module: WGCNA module eigentraits
@@ -107,7 +118,8 @@ traitModule <- readRDS("traitModule.rds")
 
 ```{r}
 harmonize("Module", links, foundr::moduleHarmony,
-          traitModule, condition_name = "diet")
+          traitModule,
+          condition_name = condition_name, normalize = normalize)
 ```
 
 ```{r}
