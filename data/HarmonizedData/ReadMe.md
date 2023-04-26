@@ -21,3 +21,5 @@ which will eventually be automated.
 - `PlaMet0`
 - `PlaMet120`
 - `Unnormalized`: experimental files
+
+This is file [ReadMe.md](https://github.com/byandell/FounderDietStudy/blob/main/data/HarmonizedData/ReadMe.md)
