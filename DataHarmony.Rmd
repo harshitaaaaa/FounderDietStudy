@@ -9,7 +9,6 @@ params:
 ---
 
 ```{r}
-rawdir <- file.path(params$rootdir, "RawData")
 harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
 ```
 
@@ -26,9 +25,16 @@ library(foundr) # github/byandell/foundr
 ```
 
 ```{r}
-for(filename in list.files("R", full.names = TRUE)) {
+harmonizeddir <- "."
+rawdir <- "../RawData"
+getwd()
+```
+
+```{r}
+for(filename in (filenames <- list.files("R", full.names = TRUE))) {
   source(filename)
 }
+filenames
 ```
 
 # Harmonize Data
@@ -40,11 +46,11 @@ Condition name and normalize
 
 ```{r}
 condition_name <- "diet"
-normalize <- FALSE
+normalize <- TRUE
 ```
 
 ```{r}
-links <- read.csv(file.path("data", "RawData", "source.csv"), fill = TRUE) %>%
+links <- read.csv(file.path("..", "RawData", "source.csv"), fill = TRUE) %>%
   mutate(address = file.path(rawdir, address))
 ```
 
@@ -113,7 +119,7 @@ harmonize("Enrich", links, EnrichHarmony, annot,
 See <WGCNA.Rmd> for construction of `traitModule`.
 
 ```{r}
-traitModule <- readRDS("traitModule.rds")
+traitModule <- readRDS(file.path("Normalized", "traitModule.rds"))
 ```
 
 ```{r}

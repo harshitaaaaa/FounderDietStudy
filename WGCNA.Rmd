@@ -20,6 +20,7 @@ knitr::opts_knit$set(root.dir = harmonizeddir)
 
 ```{r}
 options(stringsAsFactors = FALSE)
+getwd()
 ```
 
 Goal: Have one set of routines in package modulr to create module objects and to read module objects provided by Mark.
@@ -29,14 +30,6 @@ keep around for later study, perhaps.
 Probably simplify from `listof_...` to modules; later consider generic module object (which may not rely on dendro).
 
 ```{r eval = FALSE}
-# Need VPN and connection to ResearchDrive server
-
-RD <- "/Volumes/adattie/General"
-RDdir <- file.path(RD, "PersonalSharedFolder2/Mark/DO_multitissue")
-list.files(RDdir, "*.R$")
-```
-
-```{r eval = FALSE}
 if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install("GO.db")
@@ -44,12 +37,113 @@ BiocManager::install("impute")
 BiocManager::install("preprocessCore")
 ```
 
+** Need to figure out how to read with paramcode.**
+
+# Mark's WGCNA Modules
+
+All metabolites: liver, plasma at 0min, and plasma at 120min.
+Rankz transformation to normalize.
+Unsigned modules
+beta=12
+modSize = 4
+cutHeight = 0.25
+
+This is the basis for a read WGCN routine. can use 
+
+```{r}
+markHarmony <- function(mod, moddir, modRdata, modparams) {
+  paramcode <- modparams
+  paramcode$signType <- ifelse(paramcode$signType == "unsigned", "U", "S")
+  paramcode <- paste(paramcode, collapse = "")
+
+  modname <- paste0(mod, "Module")
+  if(file.exists(
+    filename <- file.path(harmonizeddir, mod,
+                          paste0(modname, "_", paramcode, ".rds")))) {
+    assign(modname, readRDS(filename))
+  } else {
+    assign(
+      modname,
+      modulr::load_wgcna(
+        moddir,
+        modRdata,
+        params = modparams))
+    if(!dir.exists(file.path(harmonizeddir, mod)))
+      dir.create(file.path(harmonizeddir, mod))
+    saveRDS(get(modname), filename)
+  }
+}
+```
+
+
+```{r}
+mod <- "Metab"
+moddir <- file.path(rawdir, "WGCNA_modules",
+                    "WGCNA_modules_all_metabolites")
+modRdata <- "WGCNA_objects_ms10.Rdata"
+modparams <- list(
+        power = 12, 
+        signType = "unsigned",
+        minSize = 4)
+MetabModule <- markHarmony(
+  mod,
+  moddir,
+  modRdata,
+  modparams)
+```
+
+The following does not work yet, since these data have "A129_nn" naming,
+different from Metab. Need to use `annot` to study. Wait for another day.
+
+```{r eval=FALSE}
+mod <- "LivGene"
+moddir <- file.path(rawdir, "WGCNA_modules",
+                    "WGCNA_modules_liverRNA",
+                    "Gene\ level\ quantitation\ from\ Colin")
+modparams <- list(
+        power = 10, 
+        signType = "unsigned",
+        minSize = 4)
+LivGeneModule <- markHarmony(
+  mod,
+  moddir,
+  "WGCNA_objects_ms10_log2_unsigned_beta10.Rdata",
+  modparams)
+
+modparams <- list(
+        power = 12, 
+        signType = "signed",
+        minSize = 4)
+LivGeneModule <- markHarmony(
+  mod,
+  moddir,
+  "WGCNA_objects_ms10_log2_unsigned_beta10.Rdata",
+  modparams)
+```
+
+```{r}
+getwd()
+normdir <- "Normalized"
+filename <- file.path(normdir, "traitModule.rds")
+traitModule <- readRDS(filename)
+```
+
+```{r}
+traitModule$Metab <- MetabModule
+```
+
+```{r}
+saveRDS(traitModule, file.path("Module", "traitModule.rds"))
+```
+
+Use code below to create `moduleData`, `moduleStats`, `moduleSignal`.
+
 # WGCNA 
 
 Read or save (RDS) module information for each dataset.
 
 ```{r}
-datasets <- c("LivMet","PlaMet0","PlaMet120","LivRna")
+datasets <- c("LivMet","PlaMet0","PlaMet120","LivRna","LivMet")
 ```
 
 ```{r}
@@ -77,16 +171,18 @@ Create `traitModule` object as list of dataset module objects.
 
 ```{r}
 normdir <- "Normalized"
-if(file.exists(filename <- file.path(harmonizeddir, normdir, "traitModule.rds"))) {
+if(file.exists(
+  filename <- file.path(harmonizeddir, normdir, "traitModule.rds"))) {
   traitModule <- readRDS(filename)
 } else {
   traitModule <- list()
-  for(mod in datasets) {
-    traitModule[[mod]] <- 
-      readRDS(
-        file.path(
-          harmonizeddir, mod,
-          paste0(mod, "Module.rds")))
+  for(mod in c(datasets, "Metab")) {
+    dirname <- file.path(harmonizeddir, mod)
+    modname <- paste0(mod, "Module")
+    files <- list.files(dirname, modname)
+    if(length(files)) {
+      traitModule[[mod]] <- readRDS(file.path(dirname, files[1]))
+    }
   }
   saveRDS(traitModule, filename)
 }
@@ -349,19 +445,6 @@ ggplot2::autoplot(eigenMet, "LivMet", "PlaMet0")
 
 # WGCNA from Mark
 
-All metabolites: liver, plasma at 0min, and plasma at 120min.
-Rankz transformation to normalize.
-Unsigned modules
-beta=12
-modSize = 4
-
-This is the basis for a read WGCN routine. can use 
-
-
-```{r}
-moddir <- file.path(rawdir, "WGCNA_modules_all_metabolites")
-```
-
 ```{r}
 load(file.path(moddir, "WGCNA_objects_ms10.Rdata"))
 ```
@@ -411,7 +494,26 @@ str(traitModule$PlaMet0$value$modules)
 tmp <- modulr::module_factors(kMEs, merge$colors)
 str(tmp)
 ```
-```{r}
-ms10Module <- modulr::load_wgcna(moddir, "WGCNA_objects_ms10.Rdata")
+
+# Temp Fix of Legacy Module Objects
+
+This was done and should not be repeated as files have moved to Obsolete.
+
+```{r eval = FALSE}
+datasets <- c("LivMet", "PlaMet0", "PlaMet120", "LivRna")
+for(dataset in datasets) {
+  iModule <- readRDS(file.path(dataset, paste0(dataset, "Module.rds")))
+  paramcode <- attr(iModule, "params")
+  for(response in names(iModule)) {
+    names(iModule[[response]])[match("geneTree", names(iModule[[response]]), nomatch = 0)] <- "dendro"
+    iModule[[response]]$params <- paramcode
+  }
+  paramcode <- paramcode[c("power", "signType", "minSize")]
+  paramcode$signType <- ifelse(paramcode$signType == "unsigned", "U", "S")
+  paramcode <- paste(paramcode, collapse = "")
+
+  filename <- file.path(dataset, paste0(dataset, "Module_", paramcode, ".rds"))
+  saveRDS(iModule, filename)
+}
 ```
 
