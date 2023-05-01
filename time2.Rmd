@@ -37,7 +37,7 @@ traitTime <- foundr::traitTimes(traitData, traitSignal,
 ```
 
 ```{r}
-print(plot(traitTime))
+print(plot(traitTime, legend_nrow = 1))
 ```
 
 ```{r}

@@ -65,7 +65,6 @@ annot <- read_excel(annotfile) %>%
   mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
 ```
 
-
 ## Physio: Physiological traits
 
 ```{r}
