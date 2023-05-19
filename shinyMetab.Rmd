@@ -1,9 +1,8 @@
 ---
-title: "Module Visualization"
+title: "Shiny Metab Module Visualization"
 author: "Brian Yandell"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
-runtime: shiny
 params:
   echo: no
   rootdir: /mnt/researchdrive/adattie/General/founder_diet_study
@@ -34,7 +33,7 @@ devtools::install_cran("markdown") #  not yet on UW dataviz
 devtools::install_cran("cowplot") #  not yet on UW dataviz
 devtools::install_cran("patchwork") #  not yet on UW dataviz
 devtools::install_cran("ggdendro") # not yet in UW dataviz
-devtools::install_github("byandell/foundr")
+#devtools::install_github("byandell/foundr")
 ```
 
 This document selects a `dataset` and creates WGCNA modules. Selecting a `response` enables visualization of stats for the modules as well as the WGCNA dendogram and color panel. Selects a `facet response` and `color response` compares two types of WGCNA modules. The first figure plots kMEs while the second one shows correlation of eigentraits across those responses. Data can be downloaded by clicking the button.
@@ -77,174 +76,74 @@ traitSignal <-
 ```
 
 ```{r}
-shiny::fluidRow(
-  shiny::column(
-    6,
-    shiny::selectInput(
-      "dataset", "Dataset:",
-      datasets)),
-  shiny::column(
-    6,
-    shiny::selectInput(
-      "response", "Response:",
-      responses))
-)
-```
-
-# WGCNA 
-
-```{r}
-shiny::renderPlot({
-  shiny::req(input$dataset, input$response)
-  foundr::ggplot_listof_wgcnaModules(traitModule[[input$dataset]], input$response)
-})
+input <- list(
+  dataset = "Metab",
+  response = "value",
+  abs = FALSE)
 ```
 
 ```{r}
-DT::renderDataTable({
-  shiny::req(input$dataset, input$response)
-  DT::datatable(
-    dplyr::filter(
+foundr::ggplot_listof_wgcnaModules(
+  traitModule[[input$dataset]],
+  input$response)
+```
+
+```{r}
+knitr::kable(
+  head(dplyr::filter(
       summary(traitModule[[input$dataset]]),
-      response == input$response),
-    options = list(paging =TRUE, pageLength = 5))
-})
-```
-
-# Module Comparisons
-
-```{r}
-mods <- shiny::reactive({
-  shiny::req(input$dataset)
-  foundr::module_kMEs(traitModule[[input$dataset]])
-})
-```
-
-```{r}
-fmodules <- shiny::reactive({
-  shiny::req(mods(), input$responseF)
-  levels(mods()[[paste0(input$responseF, "_col")]])
-})
-```
-
-```{r}
-cmodules <- shiny::reactive({
-  shiny::req(mods(), input$responseC)
-  levels(mods()[[paste0(input$responseC, "_col")]])
-})
-```
-
-```{r}
-shiny::fluidRow(
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "responseF", "Facet Response:",
-      "cellmean")),
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "responseC", "Color Response:",
-      "value"))
+      response == input$response))
 )
 ```
 
 ```{r}
-shiny::fluidRow(
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "fmodules", "Facet Modules:",
-      c("gray","turquoise"),
-      multiple = TRUE)),
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "cmodules", "Color Modules:",
-      c("gray","turquoise"),
-      multiple = TRUE)),
-  shiny::column(
-    2,
-    checkboxInput("abs", "Absolute kME?"))
-)
+mods <- foundr::module_kMEs(traitModule[[input$dataset]])
 ```
 
 ```{r}
-responseFs <- shiny::reactive({
-  shiny::req(input$response)
-  unique(c(input$response, responses))
-})
+mods1 <- foundr::module_kMEs(traitModule[[1]])
+fmodules1 <- levels(mods1[[paste0("value", "_col")]])[2:5]
+cmodules1 <- levels(mods1[[paste0("cellmean", "_col")]])[2:5]
+moddata1 <- foundr::subset_module_kMEs(
+  mods1,
+  "value", "cellmean",
+  facetmodules = fmodules1, colormodules = cmodules1)
 ```
 
 ```{r}
-responseCs <- shiny::reactive({
-  shiny::req(input$responseF)
-  responses[responses != input$responseF]
-})
+input$fmodules <- levels(mods[[paste0(input$response, "_col")]])[2:5]
 ```
 
 ```{r}
-shiny::observeEvent(
-  input$response,
-  {
-    shiny::updateSelectInput(
-      session, "responseF",
-      choices = responseFs(),
-      selected = responseFs()[1])
-})
+input$cmodules <- levels(mods[[paste0(input$response, "_col")]])[2:5]
 ```
 
 ```{r}
-shiny::observeEvent(
-  input$responseF,
-  {
-    shiny::updateSelectInput(
-      session, "responseC",
-      choices = responseCs(),
-      selected = responseCs()[1])
+moddata <- foundr::subset_module_kMEs(
+  mods,
+  input$response, input$response,
+  facetmodules = input$fmodules, colormodules = input$cmodules)
+```
 
-    shiny::updateSelectInput(
-      session, "fmodules",
-      choices = fmodules(),
-      selected = fmodules())
-})
+Here want to plot one trait against another. 
+** need to add stuff to reduce modules, etc.**
+
+```{r}
+ds <- c("PlaMet0","PlaMet120")
+compmods <- comp_datasets(traitModule, ds[1], ds[2])
+compmods <- foundr::subset_module_kMEs(compmods, ds[1], ds[2],
+         facetmodules = input$fmodules[2:5], colormodules = input$cmodules[2:5])
+
+ggplot_comp_datasets(traitModule, ds, input$abs,
+                     compmods = compmods)
 ```
 
 ```{r}
-shiny::observeEvent(
-  input$responseC,
-  {
-    shiny::updateSelectInput(
-      session, "cmodules",
-      choices = cmodules(),
-      selected = cmodules())
-})
+knitr::knit_exit()
 ```
 
 ```{r}
-moddata <- shiny::reactive({
-  shiny::req(mods(), input$responseF, input$responseC,
-             input$fmodules, input$cmodules)
-  
-  foundr::subset_module_kMEs(mods(), input$responseF, input$responseC,
-         facetmodules = input$fmodules, colormodules = input$cmodules)
-})
-```
-
-```{r}
-plotly::renderPlotly({
-  shiny::req(moddata(), input$responseF, input$responseC)
-  print(
-    ggplot2::autoplot(
-      moddata(),
-      input$responseF, input$responseC, input$abs))
-})
-```
-
-```{r}
-DT::renderDataTable({
-  shiny::req(input$dataset, input$response)
-  DT::datatable(
+head(
     dplyr::arrange(
       tidyr::pivot_wider(
         dplyr::select(
@@ -252,18 +151,15 @@ DT::renderDataTable({
           -maxkME, -minkME),
         names_from = "response", values_from = "count",
         values_fill = 0),
-      dplyr::desc(.data[[input$response]])),
-    options = list(paging =TRUE, pageLength = 5))
-})
+      dplyr::desc(.data[[input$response]]))[-1,])
 ```
 
 # Eigentrait Correlations
 
+Need concept of other traits. Used to be other responses.
+
 ```{r}
-eigens <- shiny::reactive({
-  shiny::req(input$dataset)
-  foundr::eigen_cor(traitModule[[input$dataset]])
-})
+eigens <- foundr::eigen_cor(traitModule[[input$dataset]])
 ```
 
 ```{r}
@@ -315,45 +211,7 @@ DT::renderDataTable({
 # Compare Datasets
 
 ```{r}
-shiny::fluidRow(
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "datasetD", "Facet Dataset:",
-      datasets)),
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "responseD", "Dataset Response:",
-      responses))
-)
-```
-
-```{r}
-shiny::fluidRow(
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "fmodules2", "Facet Modules:",
-      c("gray","turquoise"),
-      multiple = TRUE)),
-  shiny::column(
-    4,
-    shiny::selectInput(
-      "cmodules2", "Color Modules:",
-      c("gray","turquoise"),
-      multiple = TRUE)),
-  shiny::column(
-    2,
-    checkboxInput("absD", "Absolute kME?"))
-)
-```
-
-```{r}
-dataset2 <- shiny::reactive({
-  shiny::req(input$datasetD)
-  datasets[input$datasetD != datasets][1]
-})
+dataset2 <- datasets[input$dataset != datasets][1]
 ```
 
 ```{r}

@@ -1,0 +1,165 @@
+---
+title: "Time Measurements"
+author: "Brian Yandell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+runtime: shiny
+params:
+  echo: no
+resource_files:
+- traitData.rds
+- traitSignal.rds
+- traitStats.rds
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = ".")
+```
+
+```{r}
+#devtools::install_github("byandell/foundr")
+```
+
+# Traits over time
+
+```{r}
+traitData <- readRDS("Enrich/EnrichData.rds")
+traitSignal <- readRDS("Enrich/EnrichSignal.rds")
+traitStats <- readRDS("Enrich/EnrichStats.rds")
+if(!("dataset" %in% names(traitData))) {
+  traitData$dataset <- "Enrich"
+  traitSignal$dataset <- "Enrich"
+  traitStats$dataset <- "Enrich"
+}
+```
+
+```{r}
+dtraits <- foundr::timetraits(traitSignal, "minute")
+```
+
+```{r}
+traitTime <- foundr::traitTimes(traitData, traitSignal,
+                           "Enrich: U-13C6-Glc_enrichment_18wk",
+                           "cellmean", "minute")
+```
+
+```{r}
+print(plot(traitTime))
+```
+
+```{r}
+traitTime <- foundr::traitTimes(traitData, traitSignal,
+                           c("Physio: BW", "Physio: BL"),
+                           "cellmean", "week")
+```
+
+```{r}
+print(foundr::ggplot_traitTimes(traitTime, facet_strain = TRUE))
+```
+
+```{r}
+p1 <- foundr::ggplot_traitTimes(traitTime,
+  facet_strain = TRUE)
+print(p1)
+```
+
+## Stats
+
+```{r}
+traitSum <- foundr::traitTimes(traitStats,
+                           c("Physio: BW", "Physio: BL"),
+                           "p.value", "week", "terms")
+```
+
+```{r}
+p2 <- foundr::ggplot_traitTimes(traitSum)
+print(p2)
+```
+
+```{r}
+cowplot::plot_grid(p1,p2, ncol = 2)
+```
+
+# Shiny Code
+
+```{r}
+shiny::fluidRow(
+  shiny::column(
+    3,
+    shiny::selectInput("time", "Time Unit:", c("week", "minute","minute_summary"))),
+  shiny::column(
+    3,
+    shiny::selectInput("trait", "Trait:", NULL, multiple = TRUE)),
+  shiny::column(
+    3,
+    shiny::checkboxInput("facet_strain", "Facet Strain?", FALSE)),
+  shiny::column(
+    3,
+    shiny::selectInput("response", "Response:", c("value", "cellmean", "signal"))))
+```
+
+```{r}
+timetraits <- shiny::reactive({
+  shiny::req(input$time)
+  timecol <- ifelse(input$time == "minute_summary", "minute", input$time)
+  foundr::timetraits(traitSignal, timecol)
+})
+```
+
+```{r}
+shiny::observeEvent(
+  timetraits(),
+  {
+    shiny::updateSelectInput(
+      session, "trait",
+      choices = timetraits(),
+      selected = timetraits()[1])
+})
+```
+
+```{r}
+traitTime <- shiny::reactive({
+  shiny::req(input$trait, input$response, input$time)
+  foundr::traitTimes(
+    traitData, traitSignal,
+    input$trait, input$response, input$time)
+})
+```
+
+```{r}
+traitSum <- shiny::reactive({
+  shiny::req(input$trait, input$time)
+  foundr::traitTimes(
+    traitStats,
+    input$trait, "p.value", input$time, "terms")
+})
+```
+ 
+Want legend for terms to be over 3 lines instead of 2.
+
+```{r}
+shiny::renderPlot({
+  p1 <- foundr::ggplot_traitTimes(
+    traitTime(),
+    facet_strain = input$facet_strain)
+  
+  p2 <- foundr::ggplot_traitTimes(
+    traitSum(),
+    facet_strain = TRUE) + 
+    ggplot2::guides(color = ggplot2::guide_legend(nrow=3,
+                                              byrow=TRUE))
+
+  print(cowplot::plot_grid(p1,p2, ncol = 2, rel_widths = c(2.5,1)))
+})
+```
+
+Need to change response to be p.value or SD.
+
+```{r eval=FALSE}
+shiny::renderPlot({
+  print(foundr::ggplot_traitTimes(
+    traitSum(),
+    facet_strain = TRUE))
+})
+```

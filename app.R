@@ -8,9 +8,12 @@ library(foundr)
 
 harmonizeddir <- "/mnt/researchdrive/adattie/General/founder_diet_study/HarmonizedData"
 traitDir <- "Normalized" # "Unnormalized"
-traitData <- readRDS(file.path(harmonizeddir, traitDir, "traitData.rds"))
-traitStats <- readRDS(file.path(harmonizeddir, traitDir, "traitStats.rds"))
-traitSignal <- readRDS(file.path(harmonizeddir, traitDir, "traitSignal.rds"))
+#traitData <- readRDS(file.path(harmonizeddir, traitDir, "traitData.rds"))
+#traitStats <- readRDS(file.path(harmonizeddir, traitDir, "traitStats.rds"))
+#traitSignal <- readRDS(file.path(harmonizeddir, traitDir, "traitSignal.rds"))
+traitData <- readRDS(file.path(harmonizeddir, traitDir, "traitObject.rds"))
+traitStats <- traitSignal <- NULL
+
 customSettings <- list(
   help = "help.md",
   condition = "diet",
