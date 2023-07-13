@@ -68,7 +68,11 @@ annot <- read_excel(annotfile) %>%
 ## Physio: Physiological traits
 
 ```{r}
-harmonize("Physio", links, PhysioHarmony, condition_name = "diet")
+harmonize("Physio", links, PhysioHarmony, condition_name = "diet",
+          sheet = 2,
+          rename_function = function(x) {
+            rename(x, KetoneBodies = "KB_14wk")
+          })
 ```
 
 ## PlaMet: Plasma metabolites
