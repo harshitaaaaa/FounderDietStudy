@@ -1,0 +1,72 @@
+  ---
+title: "Report"
+output: html_document
+date: "2023-07-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data check (Physiological traits measured by Kiki and Kelly)
+
+
+```{r}
+# 01Feb23_Founder_metabolomics_LIVER.xlsx 
+
+founder_metabolomics_liver_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/01Feb23_Founder_metabolomics_LIVER.xlsx ")
+
+founder_metabolomics_liver_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(founder_metabolomics_liver_diet_data1, founder_metabolomics_liver_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(founder_metabolomics_liver_diet_data1, founder_metabolomics_liver_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/01Feb23_Founder_metabolomics_LIVER.xlsx 
+# 2. Z:/General/founder_diet_study/RawData/LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx
+```
+
+```{r}
+# 15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx
+
+Founder_T0_metabolomics_PLASMA_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx ")
+
+Founder_T0_metabolomics_PLASMA_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/LivMet/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(Founder_T0_metabolomics_PLASMA_diet_data1, Founder_T0_metabolomics_PLASMA_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(Founder_T0_metabolomics_PLASMA_diet_data1, Founder_T0_metabolomics_PLASMA_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx
+# 2. Z:/General/founder_diet_study/RawData/LivMet/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx
+```
+
+
+```{r}
+
+# 30Mar23_Founder_T120_metabolomics_PLASMA.xlsx
+
+Founder_T120_metabolomics_PLASMA_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/30Mar23_Founder_T120_metabolomics_PLASMA.xlsx")
+
+Founder_T120_metabolomics_PLASMA_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(Founder_T120_metabolomics_PLASMA_diet_data1, Founder_T120_metabolomics_PLASMA_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(Founder_T120_metabolomics_PLASMA_diet_data1, Founder_T120_metabolomics_PLASMA_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/30Mar23_Founder_T120_metabolomics_PLASMA.xlsx
+# 2. Z:/General/founder_diet_study/RawData/PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx
+```
+

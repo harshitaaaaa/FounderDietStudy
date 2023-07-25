@@ -1,0 +1,135 @@
+---
+title: "LiverLip sheet 1 and sheet 2"
+output: html_document
+date: "2023-07-24"
+params:
+  echo: no
+  rootdir: Z:/General/founder_diet_study
+
+---
+
+
+```{r}
+library(tidyr)
+library(readxl)
+library(tidyverse)
+library(foundr)
+```
+
+```{r}
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
+harmonizeddir
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = harmonizeddir)
+```
+
+```{r}
+harmonizeddir <- "."
+rawdir <- "../RawData"
+getwd()
+```
+
+```{r}
+links <- read.csv(file.path("..", "RawData", "source.csv"), fill = TRUE,quote="") %>%
+  mutate(address = file.path(rawdir, address))
+```
+
+```{r}
+# annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
+#   mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+# rawdir <- ""
+```
+
+```{r}
+# sampleKey<- read_excel("C:/Users/ADMIN/Documents/GitHub/FounderDietStudy/data/RawData/192 livers sample key.xlsx")
+```
+
+```{r}
+# filename<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+# 
+# traits <- unlist(read_excel(filename, sheet = 2,
+#                             skip = 1, n_max = 1, col_names = FALSE)[1,])
+# traits <- traits[!is.na(traits)]
+# names(traits) <- NULL
+# out <- read_excel(filename, sheet = 2, skip = 1,
+#                   .name_repair = "minimal")
+```
+
+
+```{r}
+# library(dplyr)
+# 
+# 
+# 
+# # Merge the datasets based on "label on vial" and "Name"
+# out <- out %>%
+#   left_join(sampleKey %>% select(`label on vial`, `sample name`), by = c("Name"="label on vial"))
+# 
+# 
+# # Rename the `sample name` column to `mouse_id`
+# out <- out %>%
+#   rename(mouse_id = `sample name`)
+
+
+```
+
+```{r}
+LiverLipHarmony2 <- function(dataset, annot, links...) {
+  
+  #filename <- linkpath(dataset, links)
+  # dataset<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+  # 
+  sampleKey<- read_excel("C:/Users/ADMIN/Documents/GitHub/FounderDietStudy/data/RawData/192 livers sample key.xlsx")
+  
+  # Get trait names from third sheet
+  traits <- unlist(read_excel(dataset, sheet = 1,
+                            skip = 1, n_max = 1, col_names = FALSE)[1,])
+  traits <- traits[!is.na(traits)]
+  names(traits) <- NULL
+
+  # Get data 
+  out <- read_excel(filename, sheet = 1, skip = 1,
+                  .name_repair = "minimal")
+  
+  # Subset the dataset
+  out <- out[, -c(2:5)]
+  
+  # Merge the datasets based on "label on vial" and "Name"
+out <- out %>%
+  left_join(sampleKey %>% select(`label on vial`, `sample name`), by = c("Name"="label on vial"))
+
+
+# Rename the `sample name` column to `mouse_id`
+out <- out %>%
+  rename(mouse_id = `sample name`)
+
+
+
+  # Add diet column
+  out <- left_join(
+    out,
+    annot %>%
+      rename(animal = "number", condition = "diet") %>%
+      select(mouse_id, strain, animal, sex, condition),
+    by = "mouse_id"
+  )
+
+  # Read data and pivot to longer format
+  out <- out %>%
+    pivot_longer(cols = !c(mouse_id,`Tissue Mass (mg)`,`Total Protein (µg)`,`strain`,sex,`condition`,Name),
+                 names_to = "lipids", values_to = "value")
+
+}
+```
+
+```{r}
+filename<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+
+annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+
+head(LiverLipHarmony2(filename,annot,links))
+```
