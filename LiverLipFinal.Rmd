@@ -1,0 +1,281 @@
+---
+title: "LiverLipFinal"
+output: html_document
+date: "2023-07-25"
+params:
+  echo: no
+  rootdir: Z:/General/founder_diet_study
+---
+
+```{r}
+library(tidyr)
+library(readxl)
+library(tidyverse)
+library(foundr)
+```
+
+```{r}
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
+harmonizeddir
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = harmonizeddir)
+```
+
+```{r}
+harmonizeddir <- "."
+rawdir <- "../RawData"
+getwd()
+```
+
+```{r}
+links <- read.csv(file.path("..", "RawData", "source.csv"), fill = TRUE,quote="") %>%
+  mutate(address = file.path(rawdir, address))
+```
+
+```{r}
+annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+rawdir <- ""
+```
+
+```{r}
+# LiverLipHarmony <- function(dataset, annot, links,skipNum,...) {
+# 
+#   
+#   #filename <- linkpath(dataset, links)
+# 
+#   # Get trait names from third sheet
+#   traits <- unlist(read_excel(dataset, sheet = sheetNum,
+#                             skip = skipNum, n_max = 1, col_names = FALSE)[1,])
+#   traits <- traits[!is.na(traits)]
+#   names(traits) <- NULL
+# 
+#   # Get data from the third sheet 
+#   out <- read_excel(filename, sheet = sheetNum, skip = skipNum,
+#                   .name_repair = "minimal")
+#   
+#   # Subset the dataset
+#   out <- out[, -c(minCol:maxCol)]
+# 
+# 
+#   # Add diet column
+#   out <- left_join(
+#     out,
+#     annot %>%
+#       rename(animal = "number", condition = "diet") %>%
+#       select(mouse_id, strain, animal, sex, condition),
+#     by = "mouse_id"
+#   )
+# 
+#   # Read data and pivot to longer format
+#   out <- out %>%
+#     pivot_longer(cols = !c(mouse_id, `Total Protein (µg)`,`Tissue Mass (mg)`, strain, animal, sex, condition),
+#                  names_to = "lipids", values_to = "value")
+# 
+# 
+# }
+
+```
+
+```{r}
+############ TESTING
+# 
+# dataset<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+# 
+# head(LiverLipHarmony(dataset,annot,links,n=3))
+# result <- LiverLipHarmony(dataset = "your_dataset.xlsx", sheet = 1, annot = your_annotation_dataframe, links...)
+# 
+# 
+# # Clean the first dataset
+# #filename1 <- linkpath(dataset, annot,links)
+# filename<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+# 
+# sampleKey<- read_excel("C:/Users/ADMIN/Documents/GitHub/FounderDietStudy/data/RawData/192 livers sample key.xlsx")
+# dataset1 <- LiverLipHarmony(filename, sheetNum = 3, sampleKey)
+# 
+# # Clean the second dataset
+# #filename2 <- linkpath(dataset,annotl, links)
+# 
+# dataset2 <- LiverLipHarmony(dataset=filename, 
+#                             annot = annot,
+#                             links=links,
+#                             sheetNum = 1,  
+#                             sampleKey,
+#                             minCol=2,
+#                             maxCol=5,
+#                             skipNum=1,
+#                             left_join_and_select <- function(out,
+#                                                              sampleKey) {
+#   dataset %>%
+#     left_join(sampleKey %>%
+#                 select(`label on vial`, `sample name`),
+#               by = c("Name" = "label on vial"))%>%
+#   rename(mouse_id = `sample name`)
+# }
+# )
+
+
+
+```
+################# NEW VERsION
+```{r}
+# LiverLipHarmony <- function(dataset, annot, links, sheetNum, skipNum, ...) {
+# 
+#   # Get trait names from the third sheet
+#   traits <- unlist(read_excel(dataset, sheet = sheetNum,
+#                                skip = skipNum, n_max = 1, col_names = FALSE)[1,])
+#   traits <- traits[!is.na(traits)]
+#   names(traits) <- NULL
+# 
+#   # Get data from the third sheet 
+#   out <- read_excel(dataset, sheet = sheetNum, skip = skipNum,
+#                     .name_repair = "minimal")
+# 
+#   # Add diet column
+#   out <- left_join(
+#     out,
+#     annot %>%
+#       rename(animal = "number", condition = "diet") %>%
+#       select(mouse_id, strain, animal, sex, condition),
+#     by = "mouse_id"
+#   )
+# 
+#   # Remove unwanted columns
+#   out <- out[, -c(minCol:maxCol)]
+# 
+#   # Perform the custom function on the "out" dataset
+#   if (!missing(sampleKey)) {
+#    out <- out%>%
+#     left_join(sampleKey %>%
+#                 select(`label on vial`, `sample name`),
+#               by = c("Name" = "label on vial")) %>%
+#     rename(mouse_id = `sample name`)
+# 
+#   }
+# 
+#   # pivot to longer format
+#   out <- out %>%
+#     pivot_longer(cols = !c(mouse_id, `Total Protein (µg)`, `Tissue Mass (mg)`, strain, animal, sex, condition),
+#                  names_to = "lipids", values_to = "value")
+# 
+#  
+#   return(out)
+# }
+
+```
+
+```{r}
+# 
+# left_join_and_select <- function(dataset, sampleKey) {
+#   dataset %>%
+#     left_join(sampleKey %>%
+#                 select(`label on vial`, `sample name`),
+#               by = c("Name" = "label on vial")) %>%
+#     rename(mouse_id = `sample name`)
+# }
+# 
+# 
+# dataset2 <- LiverLipHarmony(dataset = filename,
+#                             annot = annot,
+#                             links = links,
+#                             sheetNum = 3,  
+#                             skipNum = 1,
+#                             minCol=2,
+#                             maxCol=14,
+#                             )
+# 
+
+```
+
+######### VERSION3
+
+```{r}
+LiverLipHarmony <- function(dataset, annot, links, sheetNum, skipNum, minCol,maxCol,charCols,...,sampleKey) {
+# Get trait names 
+traits <- unlist(read_excel(dataset, sheet = sheetNum,
+                            skip = skipNum, n_max = 1, col_names = FALSE)[1,])
+traits <- traits[!is.na(traits)]
+names(traits) <- NULL
+
+# Get data 
+out <- read_excel(dataset, sheet = sheetNum, skip = skipNum,
+                  .name_repair = "minimal")
+
+# Remove unwanted columns
+out <- out[, -c(minCol:maxCol)]
+
+# adding mouse_id if absent
+if (!missing(sampleKey)) {
+  #print("entered")
+  out <- out%>%
+    left_join(sampleKey %>%
+                select(`label on vial`, `sample name`),
+              by = c("Name" = "label on vial")) %>%
+    rename(mouse_id = `sample name`)
+  
+}
+
+# Add diet column
+out <- left_join(
+  out,
+  annot %>%
+    rename(animal = "number", condition = "diet") %>%
+    select(mouse_id, strain, animal, sex, condition),
+  by = "mouse_id"
+)
+
+# pivot to longer format
+out <- out %>%
+  pivot_longer(cols = !charCols,
+               names_to = "lipids", values_to = "value")
+
+
+
+  return(out)
+}
+
+```
+
+```{r}
+
+filename<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx"
+
+sampleKey<- read_excel("C:/Users/ADMIN/Documents/GitHub/FounderDietStudy/data/RawData/192 livers sample key.xlsx")
+
+
+#Sheet 1
+LiverLipHarmony(dataset = filename,
+annot = annot,
+#links = links,
+sheetNum = 1  ,
+skipNum = 1,
+minCol=2,
+maxCol=5,
+charCols=c("mouse_id", "Total Protein (µg)", "Tissue Mass (mg)", "strain", "animal", "sex", "condition","Name"),
+sampleKey=sampleKey)
+
+#Sheet 2
+LiverLipHarmony(dataset = filename,
+annot = annot,
+#links = links,
+sheetNum = 2  ,
+skipNum = 1,
+minCol=2,
+maxCol=5,
+charCols=c("mouse_id", "Total Protein (µg)", "Tissue Mass (mg)", "strain", "animal", "sex", "condition","Name"),
+sampleKey=sampleKey)
+
+#Sheet 3
+LiverLipHarmony(dataset = filename,
+annot = annot,
+#links = links,
+sheetNum = 3  ,
+skipNum = 0,
+minCol=2,
+maxCol=14,
+charCols=c("mouse_id", "Total Protein (µg)", "Tissue Mass (mg)", "strain", "animal", "sex", "condition")
+)
+```
