@@ -25,8 +25,10 @@ rawdir <- ""
 
 ```{r}
 
+# Data Cleaning function 
 timepoint_data_cleaning <- function(dataset) {
   dataset <- dataset %>%
+              # Rename labels as L0,L1,L2,L3,L4,L5
               mutate(Label = gsub("PARENT", "L0", Label),
                      Label = gsub("C13-label-1", "L1", Label),
                      Label = gsub("C13-label-2", "L2", Label),
@@ -35,20 +37,24 @@ timepoint_data_cleaning <- function(dataset) {
                      Label = gsub("C13-label-5", "L5", Label),
                      Label = gsub("C13-label-6", "L6", Label))
   
-
+  # Correcting format of Timepoints column
   dataset <- dataset %>%
               mutate(Timepoints = as.numeric(gsub("min", "", Timepoints)),
-              sample = paste(Name, Label, Timepoints, "wk18", sep = "_"))
+              traits = paste(Name, Label, Timepoints, "wk18", sep = "_"))
   
   return(dataset)
 }
 
+```
+
+```{r}
 
 file_path <- "C:\\Users\\ADMIN\\Downloads\\06202023_Founder_Plasma_All_Timepoints_13C_labels_Glc_Lac_Ala_Cit_Gln_Suc_Mal_QS.xlsx"
 
 # Load all the sheets 
 all_sheets <- excel_sheets(file_path)
 
+# Data processing for all sheets in the file
 processed_datasets <- lapply(all_sheets[-1], 
                              function(sheet) {
                                sheet_data <- read_excel(file_path, sheet = sheet)
@@ -62,14 +68,16 @@ combined_dataset <- do.call(rbind, processed_datasets)
 
 ```{r}
 
-  
+# Renaming Strains to mouse_id  
 combined_dataset <- combined_dataset %>%
                     rename(mouse_id = Strains)
 
-
+# Adding strain, animal,sex and condition based on annotation file
 combined_dataset <- left_join(
                       combined_dataset,
-                      annot %>% rename(animal = "number", condition = "diet") %>% select(mouse_id,  strain, animal, sex, condition),
+                      annot %>% 
+                        rename(animal = "number", condition = "diet") %>% 
+                        select(mouse_id,  strain, animal, sex, condition),
                       by = c("mouse_id")
 )
 
