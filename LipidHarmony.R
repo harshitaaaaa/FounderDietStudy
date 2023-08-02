@@ -10,7 +10,7 @@ filename<-"Z:\\General\\founder_diet_study\\Primary data from Mark\\HollandW Atk
 sampleKey<- read_excel("C:/Users/ADMIN/Documents/GitHub/FounderDietStudy/data/RawData/192 livers sample key.xlsx")
 
 annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
-  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+                    mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
 rawdir <- ""
 
 #Sheet 1

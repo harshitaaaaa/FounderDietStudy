@@ -106,7 +106,7 @@ maxCol=5,
 charCols=c("mouse_id", "Total Protein (µg)", "Tissue Mass (mg)", "strain", "animal", "sex", "condition","Name"),
 sampleKey=sampleKey)
 
-#Sheet 2
+  #Sheet 2
 LiverLipHarmony(dataset = filename,
 annot = annot,
 #links = links,
