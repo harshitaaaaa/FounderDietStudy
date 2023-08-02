@@ -16,13 +16,21 @@ LipidHarmony <- function(dataset, links, annot, sheetNum, skipNum, minCol,maxCol
   
   # Adding mouse_id if absent
   if (!missing(sampleKey)) {
-    out <- out%>%
+    out <- out %>%
       left_join(sampleKey %>%
-                  select(`label on vial`, `sample name`),
-                by = c("Name" = "label on vial")) %>%
-      rename(mouse_id = `sample name`)
-    
+                  rename(Name = "label on vial",
+                         mouse_id = "sample name"),
+                by = "Name")
   }
+  
+  # Check for missing mouse IDs
+  m <- match(out$mouse_id, annot$mouse_id)
+  mm <- match(annot$mouse_id, out$mouse_id)
+  if(any(is.na(m)) | any(is.na(mm)))
+    stop(paste("missing mouse ids: sampleKey",
+               paste(out$mouse_id[is.na(m)], collapse = ", "),
+               " annot",
+               paste(annot$mouse_id[is.na(mm)], collapse = ", ")))
   
   # Adding diet column
   out <- left_join(out,

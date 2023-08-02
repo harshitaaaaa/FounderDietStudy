@@ -112,6 +112,8 @@ harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot,
 
 ## Lipid: Liver Lipids
 
+Note that `sampleKey` had 2 errors in it, which have been corrected. (B9-9 -> B6-9; 129-5 -> 129-15)
+
 ```{r}
 sampleKey <- read_excel("../Primary data from Mark/192 livers sample key.xlsx")
 ```
