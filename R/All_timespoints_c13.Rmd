@@ -28,7 +28,7 @@ rawdir <- ""
 # Data Cleaning function 
 timepoint_data_cleaning <- function(dataset) {
   dataset <- dataset %>%
-              # Rename labels as L0,L1,L2,L3,L4,L5
+              # Rename labels as L0,L1,L2,L3,L4,L5,L6
               mutate(Label = gsub("PARENT", "L0", Label),
                      Label = gsub("C13-label-1", "L1", Label),
                      Label = gsub("C13-label-2", "L2", Label),
