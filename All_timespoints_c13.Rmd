@@ -1,0 +1,78 @@
+---
+title: "timepoint"
+output: html_document
+date: "2023-08-02"
+params:
+  echo: no
+  rootdir: Z:/General/founder_diet_study
+---
+
+```{r}
+library(tidyr)
+library(readxl)
+library(tidyverse)
+library(foundr)
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+rawdir <- ""
+```
+
+
+```{r}
+
+timepoint_data_cleaning <- function(dataset) {
+  dataset <- dataset %>%
+              mutate(Label = gsub("PARENT", "L0", Label),
+                     Label = gsub("C13-label-1", "L1", Label),
+                     Label = gsub("C13-label-2", "L2", Label),
+                     Label = gsub("C13-label-3", "L3", Label),
+                     Label = gsub("C13-label-4", "L4", Label),
+                     Label = gsub("C13-label-5", "L5", Label),
+                     Label = gsub("C13-label-6", "L6", Label))
+  
+
+  dataset <- dataset %>%
+              mutate(Timepoints = as.numeric(gsub("min", "", Timepoints)),
+              sample = paste(Name, Label, Timepoints, "wk18", sep = "_"))
+  
+  return(dataset)
+}
+
+
+file_path <- "C:\\Users\\ADMIN\\Downloads\\06202023_Founder_Plasma_All_Timepoints_13C_labels_Glc_Lac_Ala_Cit_Gln_Suc_Mal_QS.xlsx"
+
+# Load all the sheets 
+all_sheets <- excel_sheets(file_path)
+
+processed_datasets <- lapply(all_sheets[-1], 
+                             function(sheet) {
+                               sheet_data <- read_excel(file_path, sheet = sheet)
+                               timepoint_data_cleaning(sheet_data)
+})
+
+# Combine all the processed datasets into a single dataframe
+combined_dataset <- do.call(rbind, processed_datasets)
+
+```
+
+```{r}
+
+  
+combined_dataset <- combined_dataset %>%
+                    rename(mouse_id = Strains)
+
+
+combined_dataset <- left_join(
+                      combined_dataset,
+                      annot %>% rename(animal = "number", condition = "diet") %>% select(mouse_id,  strain, animal, sex, condition),
+                      by = c("mouse_id")
+)
+
+
+head(combined_dataset)
+```
