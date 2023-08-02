@@ -3,8 +3,11 @@ google,https://drive.google.com/drive/u/1/folders/1v2xyz0s0ELYkEwMdEOMjAvLVWJA1O
 annot,Annotation/mouse annotations for founder diet study.xlsx,
 Physio,Physio/Final raw and computed in vivo founder data for Mark for correlations.xlsx,In Vivo Physiological traits
 PlaMet0,PlaMet/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 0min
-PlaMet120,PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 120min 
+PlaMet120,PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx,Plasma metabolites 120min
 LivRna,LivRna/normalizedcount.csv,Liver gene expression
 liver_annot,LivRna/varianceStabilizingTransformation/annotation2.csv,
 LivMet,LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx,Liver metabolites
 Enrich,Enrich/Founder_plasma_timepoints_data_summary_Qiushi_shared.xlsx,Plasma enrichment over time
+Vivo,../Primary data from Mark/Final in vivo founder data for analysis (raw and computed).xlsx,In vivo Physiological Data
+Lipid,../Primary data from Mark/HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx,Liver Lipids
+PlaEnrich,../Primary data from Mark/06202023_Founder_Plasma_All_Timepoints_13C_labels_Glc_Lac_Ala_Cit_Gln_Suc_Mal_QS.xlsx,Plasma Time Points

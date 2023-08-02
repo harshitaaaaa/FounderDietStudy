@@ -13,3 +13,5 @@ rsconnect/
 #inst/
 *.pdf
 *.xlsx
+*.sqlite
+*.csv
