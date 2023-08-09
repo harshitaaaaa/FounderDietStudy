@@ -116,6 +116,8 @@ Note that `sampleKey` had 2 errors in it, which have been corrected. (B9-9 -> B6
 
 ```{r}
 sampleKey <- read_excel("../Primary data from Mark/192 livers sample key.xlsx")
+sampleKey[sampleKey[1] == 60, 2] <- "B6-9"
+sampleKey[sampleKey[1] == 167, 2] <- "129-15"
 ```
 
 ```{r}
@@ -129,16 +131,41 @@ harmonize("Lipid", links, LipidHarmony, annot,
           condition_name = condition_name, normalize = normalize)
 ```
 
+```{r eval = FALSE}
+dir(".")
+LipidData <- readRDS("Lipid/LipidData.rds")
+LipidData <- LipidData %>% mutate(animal = as.character(animal))
+saveRDS(LipidData, "Lipid/LipidData.rds")
+```
+
+```{r eval = FALSE}
+LipidStats <- readRDS("Lipid/LipidStats.rds")
+keepTraits <- unique(LipidStats$trait)
+LipidSignal <- partition(readRDS("Lipid/LipidData.rds"))
+LipidSignal <- 
+  dplyr::filter(
+      partition(readRDS("Lipid/LipidData.rds")),
+      .data$trait %in% keepTraits)
+saveRDS(LipidSignal, "Lipid/LipidStats.rds")
+```
+
 ## Enrich: Plasma enrichment over time
 
 ```{r}
 harmonize("Enrich", links, EnrichHarmony, annot,
           condition_name = condition_name, normalize = normalize)
 ```
-
+  
 ```{r}
 harmonize("PlaEnrich", links, Enrich3Harmony, annot,
           condition_name = condition_name, normalize = normalize)
+```
+
+```{r eval = FALSE}
+dir(".")
+PlaEnrichData <- readRDS("PlaEnrich/PlaEnrichData.rds")
+PlaEnrichData <- PlaEnrichData %>% mutate(animal = as.character(animal))
+saveRDS(PlaEnrichData, "PlaEnrich/PlaEnrichData.rds")
 ```
 
 ## Module: WGCNA module eigentraits
@@ -156,5 +183,5 @@ harmonize("Module", links, foundr::moduleHarmony,
 ```
 
 ```{r}
-bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Module","Enrich"))
+bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Lipid","Module","Enrich","PlaEnrich"))
 ```

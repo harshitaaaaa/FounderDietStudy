@@ -47,5 +47,6 @@ LipidHarmony <- function(dataset, links, annot, sheetNum, skipNum, minCol,maxCol
   
   out %>%
     rename(trait = "lipids") %>%
+    mutate(animal = as.character(animal)) %>%
     select(strain, sex, animal, condition, trait, value)
 }

@@ -27,7 +27,15 @@ Enrich3Harmony <- function(dataset, links, annot, ...) {
       select(mouse_id,  strain, animal, sex, condition),
     by = c("mouse_id")
   ) %>%
-    rename(value = "NA Corrected with zero") %>%
+    rename(value = "NA Corrected with zero",
+           run = "Sample Name") %>%
+    mutate(animal = as.character(animal),
+           run = as.numeric(str_remove(str_remove(run, "-.*$"), "^run"))) %>%
+    
+    # Only use latest run if duplicates done.
+    group_by(strain, sex, animal, condition, trait) %>%
+    summarize(value = value[which.max(run)], .groups = "drop") %>%
+    ungroup() %>%
     select(strain, sex, animal, condition, trait, value)
 }
 
@@ -45,6 +53,7 @@ timepoint_data_cleaning <- function(dataset) {
   
   # Correcting format of Timepoints column
   dataset %>%
-    mutate(Timepoints = as.numeric(gsub("min", "", Timepoints)),
+    mutate(
+      Timepoints = as.numeric(gsub("min", "", Timepoints)),
            trait = paste(Name, Label, Timepoints, "wk18", sep = "_"))
 }

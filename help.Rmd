@@ -1,0 +1,16 @@
+This study has two diets (`HC_LF` = high carb, low fat; `HF_LC` = high fat, low carb) with three measurement sets collected on 192 mice:
+  
+```{r echo=FALSE}
+dataset <- read.csv(file.path("data/RawData", "source.csv"))
+dataset <- dataset[dataset$longname != "",]
+dataset[2] <- "--"
+rownames(dataset) <- NULL
+colnames(dataset) <- c("Name","","Description")
+knitr::kable(dataset, "simple")
+```
+
+<hr>
+See also
+
+- [Attie Lab Diabetes Database](http://diabetes.wisc.edu/)
+- GitHub: [byandell/FounderDietStudy](https://github.com/byandell/FounderDietStudy)
