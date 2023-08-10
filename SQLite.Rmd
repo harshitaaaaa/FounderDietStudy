@@ -1,0 +1,54 @@
+---
+title: "SQLite"
+author: "Brian Yandell"
+date: "2023-07-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(dbplyr)
+```
+
+```{r}
+dirpath <- file.path("big")
+traitData <- readRDS(file.path(dirpath, "traitData.rds"))
+traitStats <- readRDS(file.path(dirpath, "traitStats.rds"))
+traitSignal <- readRDS(file.path(dirpath, "traitSignal.rds"))
+```
+
+```{r}
+mydb <- RSQLite::dbConnect(RSQLite::SQLite(), "traitData.sqlite")
+RSQLite::dbDisconnect(mydb)
+```
+
+```{r eval = FALSE}
+mydb <- RSQLite::dbConnect(RSQLite::SQLite(), "traitData.sqlite")
+RSQLite::dbWriteTable(mydb, value = traitData, name = "traitData",
+                      overwrite = TRUE,
+                      indexes = list(c("dataset", "trait")))
+RSQLite::dbListTables(mydb)
+RSQLite::dbDisconnect(mydb)
+```
+
+```{r}
+mydb <- RSQLite::dbConnect(RSQLite::SQLite(), "traitData.sqlite")
+head(dplyr::tbl(mydb, "traitdata"))
+```
+
+```{r}
+mydb <- RSQLite::dbConnect(RSQLite::SQLite(), "traitData.sqlite")
+tmp <- dplyr::collect(dplyr::filter(dplyr::tbl(mydb, "traitdata"),
+                                    dataset == "Physio", trait == "BW_6wk"))
+```
+
+```{r}
+str(tmp)
+```
+
