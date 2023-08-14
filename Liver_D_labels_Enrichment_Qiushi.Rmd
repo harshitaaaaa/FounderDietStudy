@@ -1,0 +1,127 @@
+---
+title: "Qiushi new data"
+output: html_document
+date: "2023-08-09"
+params:
+  echo: no
+  rootdir: Z:/General/founder_diet_study
+
+---
+
+```{r}
+library(tidyr)
+library(readxl)
+library(tidyverse)
+library(foundr)
+```
+
+```{r}
+harmonizeddir <- file.path(params$rootdir, "HarmonizedData")
+harmonizeddir
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = harmonizeddir)
+```
+
+```{r}
+harmonizeddir <- "."
+rawdir <- "../RawData"
+getwd()
+```
+
+```{r}
+links <- read.csv(file.path("..", "RawData", "source.csv"), fill = TRUE,quote="") %>%
+  mutate(address = file.path(rawdir, address))
+getwd()
+links
+n<-'Z:/General/founder_diet_study/HarmonizedData/../Primary data from Mark/08Aug23_Founder_Data_To_Wisconsin/07Aug2023_Founder_Liver_D_labels_Enrichment_To_Wisconsin.xlsx'
+
+nread<-read_xlsx(n)
+head(nread)
+
+```
+
+```{r}
+annot <- read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\mouse annotations for founder diet study.xlsx") %>%
+  mutate(diet = ifelse(as.character(diet_no) == "200339", "HC_LF", "HF_LC"))
+rawdir <- ""
+#annot
+```
+
+```{r}
+dataset<-"Z:/General/founder_diet_study/Primary data from Mark/08Aug23_Founder_Data_To_Wisconsin/07Aug2023_Founder_Liver_D_labels_Enrichment_To_Wisconsin.xlsx"
+filename<-read_excel(dataset)
+filename<-drop(is.na(filename))
+which(is.na(filename))
+filename<-(dataset)
+head(filename)
+```
+
+
+
+```{r}
+LipidHarmony <- function(dataset, links, annot, sheetNum, skipNum, minCol,maxCol,charCols,...,sampleKey) {
+
+  filename <- linkpath(dataset, links)
+  
+  # Get trait names
+  traits <- unlist(read_excel(filename, sheet = sheetNum,
+                              skip = skipNum, n_max = 1, col_names = FALSE)[1,])
+  traits <- traits[!is.na(traits)]
+  names(traits) <- NULL
+  
+  # Get data
+ library(dplyr)
+
+  #filename<-dataset
+  out <- read_excel(filename, sheet = sheetNum, skip = skipNum,
+                    .name_repair = "minimal")
+  out<-out%>%
+    mutate(mouse_id = paste(Strains, Number, sep = "-"))
+  colnames(out)
+  out <- out %>%
+    filter(!is.na(Sexes))
+
+
+  # Remove unwanted columns
+  out <- out[, -c(minCol:maxCol)]
+  
+  # Adding mouse_id if absent
+  # if (!missing(sampleKey)) {
+  #   out <- out %>%
+  #     left_join(sampleKey %>%
+  #                 rename(Name = "label on vial",
+  #                        mouse_id = "sample name"),
+  #               by = "Name")
+  # }
+  # 
+  
+
+  # Adding diet column
+  out <- left_join(out,
+                   annot %>%
+                     rename(animal = "number", condition = "diet") %>%
+                     select(mouse_id, strain, animal, sex, condition),
+                   by = "mouse_id")
+
+  # Pivot to longer format
+  out <- out %>%
+    pivot_longer(cols = !charCols,
+                 names_to = "lipids",
+                 values_to = "value")
+
+  out %>%
+    rename(trait = "lipids") %>%
+    select(strain, sex, animal, condition, trait, value)
+}
+
+```
+
+```{r}
+
+LipidHarmony("LiverD",links, annot,sheetNum=1,skipNum=0, minCol=2,maxCol=3,charCols=c("strain","animal","sex","condition","mouse_id","Strains","Diets")) 
+
+```
+
