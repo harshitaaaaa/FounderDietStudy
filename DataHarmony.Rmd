@@ -5,7 +5,7 @@ date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 params:
   echo: no
-  rootdir: /mnt/researchdrive/adattie/General/founder_diet_study
+  rootdir: /Volumes/adattie/General/founder_diet_study
 ---
 
 ```{r}
@@ -68,7 +68,11 @@ annot <- read_excel(annotfile) %>%
 ## Physio: Physiological traits
 
 ```{r}
-harmonize("Physio", links, PhysioHarmony, condition_name = "diet")
+harmonize("Physio", links, PhysioHarmony, condition_name = "diet",
+          sheet = 2,
+          rename_function = function(x) {
+            rename(x, KetoneBodies = "KB_14wk")
+          })
 ```
 
 ## PlaMet: Plasma metabolites
@@ -106,11 +110,62 @@ harmonize("LivRna", links, LivRnaHarmony, annot, liverAnnot,
           condition_name = condition_name, normalize = normalize)
 ```
 
+## Lipid: Liver Lipids
+
+Note that `sampleKey` had 2 errors in it, which have been corrected. (B9-9 -> B6-9; 129-5 -> 129-15)
+
+```{r}
+sampleKey <- read_excel("../Primary data from Mark/192 livers sample key.xlsx")
+sampleKey[sampleKey[1] == 60, 2] <- "B6-9"
+sampleKey[sampleKey[1] == 167, 2] <- "129-15"
+```
+
+```{r}
+harmonize("Lipid", links, LipidHarmony, annot,
+                sheetNum = 1  ,
+                skipNum = 1,
+                minCol=2,
+                maxCol=5,
+                charCols=c("mouse_id", "Total Protein (µg)", "Tissue Mass (mg)", "strain", "animal", "sex", "condition","Name"),
+                sampleKey=sampleKey,
+          condition_name = condition_name, normalize = normalize)
+```
+
+```{r eval = FALSE}
+dir(".")
+LipidData <- readRDS("Lipid/LipidData.rds")
+LipidData <- LipidData %>% mutate(animal = as.character(animal))
+saveRDS(LipidData, "Lipid/LipidData.rds")
+```
+
+```{r eval = FALSE}
+LipidStats <- readRDS("Lipid/LipidStats.rds")
+keepTraits <- unique(LipidStats$trait)
+LipidSignal <- partition(readRDS("Lipid/LipidData.rds"))
+LipidSignal <- 
+  dplyr::filter(
+      partition(readRDS("Lipid/LipidData.rds")),
+      .data$trait %in% keepTraits)
+saveRDS(LipidSignal, "Lipid/LipidStats.rds")
+```
+
 ## Enrich: Plasma enrichment over time
 
 ```{r}
 harmonize("Enrich", links, EnrichHarmony, annot,
           condition_name = condition_name, normalize = normalize)
+```
+  
+```{r}
+harmonize("PlaEnrich", links, Enrich3Harmony, annot,
+          condition_name = condition_name, normalize = normalize)
+```
+
+```{r eval = FALSE}
+dir(".")
+PlaEnrichData <- readRDS("PlaEnrich/PlaEnrichData.rds")
+PlaEnrichData <- PlaEnrichData %>% mutate(animal = as.character(animal))
+saveRDS(PlaEnrichData, "PlaEnrich/PlaEnrichData.rds")
 ```
 
 ## Module: WGCNA module eigentraits
@@ -128,5 +183,5 @@ harmonize("Module", links, foundr::moduleHarmony,
 ```
 
 ```{r}
-bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Module","Enrich"))
+bind_traits(c("Physio","PlaMet0","PlaMet120","LivMet","LivRna","Lipid","Module","Enrich","PlaEnrich"))
 ```

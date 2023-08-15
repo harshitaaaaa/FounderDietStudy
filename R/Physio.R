@@ -1,11 +1,8 @@
-PhysioHarmony <- function(dataset, links, ...) {
+PhysioHarmony <- function(dataset, links, sheet = 2, rename_function, ...) {
   filename <- linkpath(dataset, links)
   
-  # Data are in sheet 2 starting on line 1
-  out <- read_excel(filename, sheet = 2) %>%
-    
-    # Rename Ketone Bodies from KB_14wk
-    rename(KetoneBodies = "KB_14wk") %>%
+  # Read data and pivot to longer format; rename animal and condition.
+  out <- read_excel(filename, sheet = sheet) %>%
     
     # Traits begin in column 5
     pivot_longer(-(1:4), names_to = "trait", values_to = "value") %>%
@@ -21,6 +18,11 @@ PhysioHarmony <- function(dataset, links, ...) {
     
     # These are harmonized columns and their names.
     select(strain, sex, animal, condition, trait, value)
+  
+  # Rename columns if provided.
+  if(!missing(rename_function) && is.function(rename_function)) {
+    out <- rename_function(out)
+  }
 
   # Add area under curve traits for measurements over minutes.
   GTT <- out %>%

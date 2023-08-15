@@ -8,4 +8,6 @@ LivRna,LivRna/normalizedcount.csv,Liver gene expression
 liver_annot,LivRna/varianceStabilizingTransformation/annotation2.csv,
 LivMet,LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx,Liver metabolites
 Enrich,Enrich/Founder_plasma_timepoints_data_summary_Qiushi_shared.xlsx,Plasma enrichment over time
-vivo_founder_diet_data,Primary data from Mark/Final in vivo founder data for analysis (raw and computed).xlsx,vivo founder diet data
+Vivo,../Primary data from Mark/Final in vivo founder data for analysis (raw and computed).xlsx,In vivo Physiological Data
+Lipid,../Primary data from Mark/HollandW AtkinsonD 20230327 founder LIVER LIPIDS.xlsx,Liver Lipids
+PlaEnrich,../Primary data from Mark/06202023_Founder_Plasma_All_Timepoints_13C_labels_Glc_Lac_Ala_Cit_Gln_Suc_Mal_QS.xlsx,Plasma Time Points
