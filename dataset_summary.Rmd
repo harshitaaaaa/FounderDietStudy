@@ -1,0 +1,133 @@
+---
+title: "Report"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-07-23"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+Data check (Physiological traits measured by Kiki and Kelly)
+# 01Feb23_Founder_metabolomics_LIVER.xlsx 
+
+```{r}
+# 01Feb23_Founder_metabolomics_LIVER.xlsx 
+
+founder_metabolomics_liver_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/01Feb23_Founder_metabolomics_LIVER.xlsx ")
+
+founder_metabolomics_liver_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(founder_metabolomics_liver_diet_data1, founder_metabolomics_liver_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(founder_metabolomics_liver_diet_data1, founder_metabolomics_liver_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/01Feb23_Founder_metabolomics_LIVER.xlsx 
+# 2. Z:/General/founder_diet_study/RawData/LivMet/01Feb23_Founder_Livers_metabolomics_combined_unique_isobars_removed.xlsx
+```
+
+
+# 15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx
+```{r}
+# 15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx
+
+Founder_T0_metabolomics_PLASMA_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx ")
+
+Founder_T0_metabolomics_PLASMA_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/LivMet/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(Founder_T0_metabolomics_PLASMA_diet_data1, Founder_T0_metabolomics_PLASMA_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(Founder_T0_metabolomics_PLASMA_diet_data1, Founder_T0_metabolomics_PLASMA_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/15Aug2022_Founder_T0_metabolomics_PLASMA.xlsx
+# 2. Z:/General/founder_diet_study/RawData/LivMet/15Aug2022_Founder_T0_metabolomics_combined_unique_isobars_removed.xlsx
+```
+
+# 30Mar23_Founder_T120_metabolomics_PLASMA.xlsx
+```{r}
+
+# 30Mar23_Founder_T120_metabolomics_PLASMA.xlsx
+
+Founder_T120_metabolomics_PLASMA_diet_data1<-read.csv("Z:/General/founder_diet_study/Primary data from Mark/30Mar23_Founder_T120_metabolomics_PLASMA.xlsx")
+
+Founder_T120_metabolomics_PLASMA_diet_data2<-read.csv("Z:/General/founder_diet_study/RawData/PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx")
+
+# Step 1: Check if the data frames are equal using `identical()`
+identical(Founder_T120_metabolomics_PLASMA_diet_data1, Founder_T120_metabolomics_PLASMA_diet_data2)
+
+# Step 2: Compare row by row using `all.equal()`
+all.equal(Founder_T120_metabolomics_PLASMA_diet_data1, Founder_T120_metabolomics_PLASMA_diet_data2)
+
+# CONCLUSION:  Both the datasets are the same 
+# Location of datasets 
+# 1. Z:/General/founder_diet_study/Primary data from Mark/30Mar23_Founder_T120_metabolomics_PLASMA.xlsx
+# 2. Z:/General/founder_diet_study/RawData/PlaMet/30Mar23_Founder_Plasma_tp120min_metabolomics_combined_unique_isobars_removed.xlsx
+```
+
+
+Physiological traits measured by Kiki and Kelly
+#Final in vivo founder data for analysis (raw and computed).xlsx 
+
+```{r}
+library(dplyr)
+
+# New dataset given by Kiki and Kelly
+filename1<-read_excel("Z:/General/founder_diet_study/Primary data from Mark/Final in vivo founder data for analysis (raw and computed).xlsx",sheet = 2)
+
+# old dataset
+filename2<-read_excel("Z:/General/founder_diet_study/RawData/Physio/Final raw and computed in vivo founder data for Mark for correlations.xlsx",sheet = 2)
+
+# Compare the column names of filename1 and filename2
+col_names_diff <- setdiff(names(filename1), names(filename2))
+
+# Check if there are any differences
+
+# check columns absent in filename1
+if (length(col_names_diff) > 0) {
+  print("Column names present in filename1 but not in filename2:")
+  print(col_names_diff)
+} else {
+  print("The column names of filename1 and filename2 are identical.")
+}
+
+col_names_diff <- setdiff(names(filename2), names(filename1))
+
+# check columns absent in filename2
+if (length(col_names_diff) > 0) {
+  print("Column names present in filename2 but not in filename1:")
+  print(col_names_diff)
+} else {
+  print("The column names of filename1 and filename2 are identical.")
+}
+
+```
+
+```{r}
+
+# Guide obtained from first sheet of the dataset
+
+Definitions<-read_excel("Z:\\General\\founder_diet_study\\Primary data from Mark\\Final in vivo founder data for analysis (raw and computed).xlsx",sheet = "Definitions and notes")
+
+result <- Definitions %>%
+  slice(2:28) %>%
+  select(1:3) %>%
+  setNames(.[1, ]) %>%
+  slice(-1)
+
+result
+
+
+```
